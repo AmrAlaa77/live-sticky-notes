@@ -25,3 +25,5 @@ npm run dev
 Connect this repository to Vercel and deploy the `main` branch.
 
 The current Supabase public client configuration is in `src/supabase.js`.
+
+Git-connected deployment is enabled for the `main` branch.
