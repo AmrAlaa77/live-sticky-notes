@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
+import html2canvas from 'html2canvas'
 import {
   addNote,
   clearRoom,
@@ -49,6 +50,7 @@ const I18N = {
     background: 'Background',
     changeBackground: 'Change background',
     removeBackground: 'Remove background',
+    screenshot: 'Screenshot',
     clearConfirmTitle: 'Clear all sticky notes?',
     clearConfirmBody: 'This removes every note from this room.',
     clearAll: 'Clear all',
@@ -92,6 +94,7 @@ const I18N = {
     background: 'الخلفية',
     changeBackground: 'تغيير الخلفية',
     removeBackground: 'إزالة الخلفية',
+    screenshot: 'لقطة شاشة',
     clearConfirmTitle: 'مسح جميع الملاحظات؟',
     clearConfirmBody: 'سيؤدي هذا إلى إزالة كل ملاحظة من هذه الغرفة.',
     clearAll: 'مسح الكل',
@@ -417,6 +420,7 @@ function Facilitator() {
     try { return sessionStorage.getItem('lsn_bg_' + room) || '' } catch { return '' }
   })
   const containerRef = useRef(null)
+  const boardRef = useRef(null)
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -475,6 +479,34 @@ function Facilitator() {
     sessionStorage.removeItem('lsn_bg_' + room)
   }
 
+  async function takeScreenshot() {
+    const board = boardRef.current
+    if (!board) return
+    try {
+      const canvas = await html2canvas(board, {
+        backgroundColor: null,
+        useCORS: true,
+        scale: Math.min(2, window.devicePixelRatio || 1.5),
+        width: board.scrollWidth,
+        height: board.scrollHeight,
+        windowWidth: board.scrollWidth,
+        windowHeight: board.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+      })
+      const link = document.createElement('a')
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      link.download = `live-sticky-notes-${room}-${stamp}.png`
+      link.href = canvas.toDataURL('image/png')
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (err) {
+      console.error('Screenshot failed:', err)
+      alert('Could not create screenshot. Please try again.')
+    }
+  }
+
   if (exists === null) return <div className="home"><div className="home-card"><p>Loading…</p></div></div>
   if (!exists) return (
     <div className="home">
@@ -508,6 +540,7 @@ function Facilitator() {
             {background ? t.changeBackground : t.background}
           </button>
           {background && <button className="btn btn-ghost btn-sm" onClick={removeBackground}>{t.removeBackground}</button>}
+          <button className="btn btn-ghost btn-sm" onClick={takeScreenshot}>{t.screenshot}</button>
           <button className="btn btn-ghost btn-sm" onClick={() => setClearOpen(true)}>{t.clearScreen}</button>
           <button className="btn btn-ghost btn-sm" onClick={toggleFullscreen}>{fullscreen ? t.exitFullscreen : t.fullscreen}</button>
           <LanguageSwitch toolbar />
@@ -515,6 +548,7 @@ function Facilitator() {
       </div>
 
       <div
+        ref={boardRef}
         className="board"
         style={background ? {
           backgroundImage: `linear-gradient(rgba(0,0,0,.08),rgba(0,0,0,.08)), url(${background})`,
