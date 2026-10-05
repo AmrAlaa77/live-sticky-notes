@@ -9,9 +9,12 @@ import {
   deleteNote,
   deleteParticipantNote,
   moveNote,
+  getRoom,
   roomExists,
   subscribeToNotes,
+  subscribeToRoom,
   updateParticipantNote,
+  updateRoom,
 } from './supabase'
 
 const I18N = {
@@ -20,6 +23,11 @@ const I18N = {
     facilitatorStart: 'Start a session',
     facilitatorStartHint: 'Create a room and display it on a projector or laptop.',
     createRoom: 'Create room',
+    chooseMode: 'Choose a mode',
+    groupedMode: 'Grouped Sticky Notes',
+    groupedDesc: 'Automatically arrange notes and group them by color.',
+    placeItMode: 'Place It',
+    placeItDesc: 'Participants choose exactly where their note appears on the canvas.',
     participantJoinHint: 'Have a room code? Join from your phone.',
     enterRoomCode: 'Enter room code',
     join: 'Join',
@@ -51,6 +59,11 @@ const I18N = {
     changeBackground: 'Change background',
     removeBackground: 'Remove background',
     screenshot: 'Screenshot',
+    promptPanel: 'Facilitator prompt',
+    promptPlaceholder: 'Paste your text, facts, steps or instructions here…',
+    choosePosition: 'Choose where your note should appear',
+    positionHint: 'Tap anywhere on the canvas preview.',
+    positionSelected: 'Position selected',
     clearConfirmTitle: 'Clear all sticky notes?',
     clearConfirmBody: 'This removes every note from this room.',
     clearAll: 'Clear all',
@@ -64,6 +77,11 @@ const I18N = {
     facilitatorStart: 'ابدأ جلسة',
     facilitatorStartHint: 'أنشئ غرفة واعرضها على جهاز عرض أو حاسوب محمول.',
     createRoom: 'إنشاء غرفة',
+    chooseMode: 'اختر الوضع',
+    groupedMode: 'الملاحظات المجمّعة',
+    groupedDesc: 'ترتيب الملاحظات تلقائيًا وتجميعها حسب اللون.',
+    placeItMode: 'Place It',
+    placeItDesc: 'يختار المشاركون المكان الذي تظهر فيه ملاحظتهم على اللوحة.',
     participantJoinHint: 'لديك رمز غرفة؟ انضم من هاتفك.',
     enterRoomCode: 'أدخل رمز الغرفة',
     join: 'انضمام',
@@ -95,6 +113,11 @@ const I18N = {
     changeBackground: 'تغيير الخلفية',
     removeBackground: 'إزالة الخلفية',
     screenshot: 'لقطة شاشة',
+    promptPanel: 'نص الميسّر',
+    promptPlaceholder: 'الصق النص أو الحقائق أو الخطوات أو التعليمات هنا…',
+    choosePosition: 'اختر مكان ظهور ملاحظتك',
+    positionHint: 'اضغط في أي مكان على معاينة اللوحة.',
+    positionSelected: 'تم اختيار المكان',
     clearConfirmTitle: 'مسح جميع الملاحظات؟',
     clearConfirmBody: 'سيؤدي هذا إلى إزالة كل ملاحظة من هذه الغرفة.',
     clearAll: 'مسح الكل',
@@ -138,11 +161,12 @@ function Home() {
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const [joining, setJoining] = useState(false)
+  const [mode, setMode] = useState('grouped')
 
   async function start() {
     setCreating(true)
     try {
-      const room = await createRoom()
+      const room = await createRoom(mode)
       navigate('/facilitator/' + room)
     } catch (e) {
       alert('Error creating room: ' + e.message)
@@ -176,6 +200,17 @@ function Home() {
         <div className="home-card">
           <h2>{t.facilitatorStart}</h2>
           <p>{t.facilitatorStartHint}</p>
+          <div className="mode-picker">
+            <div className="mode-picker-label">{t.chooseMode}</div>
+            <button type="button" className={`mode-option ${mode === 'grouped' ? 'active' : ''}`} onClick={() => setMode('grouped')}>
+              <strong>{t.groupedMode}</strong>
+              <span>{t.groupedDesc}</span>
+            </button>
+            <button type="button" className={`mode-option ${mode === 'place_it' ? 'active' : ''}`} onClick={() => setMode('place_it')}>
+              <strong>{t.placeItMode}</strong>
+              <span>{t.placeItDesc}</span>
+            </button>
+          </div>
           <button className="btn btn-primary" onClick={start} disabled={creating}>{creating ? '…' : t.createRoom}</button>
         </div>
         <div className="home-card">
@@ -410,22 +445,42 @@ function Facilitator() {
   const room = code.toUpperCase()
   const { t } = useLang()
   const [exists, setExists] = useState(null)
+  const [roomConfig, setRoomConfig] = useState(null)
   const [connectionError, setConnectionError] = useState('')
   const [notes, setNotes] = useState([])
   const [qrVisible, setQrVisible] = useState(true)
   const [clearOpen, setClearOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [similar, setSimilar] = useState(null)
-  const [background, setBackground] = useState(() => {
-    try { return sessionStorage.getItem('lsn_bg_' + room) || '' } catch { return '' }
-  })
+  const [background, setBackground] = useState('')
+  const [promptText, setPromptText] = useState('')
+  const promptTimerRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
   const fileRef = useRef(null)
 
   useEffect(() => {
-    roomExists(room).then(setExists).catch((e) => { setConnectionError(e.message); setExists(false) })
+    getRoom(room)
+      .then((data) => {
+        setRoomConfig(data)
+        setExists(Boolean(data))
+        if (data) {
+          setBackground(data.background_data || '')
+          setPromptText(data.prompt_text || '')
+        }
+      })
+      .catch((e) => { setConnectionError(e.message); setExists(false) })
   }, [room])
+
+  useEffect(() => {
+    if (!exists) return
+    return subscribeToRoom(room, (data) => {
+      if (!data) return
+      setRoomConfig(data)
+      setBackground(data.background_data || '')
+      setPromptText((current) => current === (roomConfig?.prompt_text || '') ? (data.prompt_text || '') : current)
+    })
+  }, [room, exists])
 
   useEffect(() => {
     if (exists) return subscribeToNotes(room, setNotes)
@@ -437,11 +492,13 @@ function Facilitator() {
     return () => document.removeEventListener('fullscreenchange', handler)
   }, [])
 
+  const placeIt = roomConfig?.mode === 'place_it'
+
   useEffect(() => {
-    if (!exists || notes.length === 0 || !needsLayout(notes, qrVisible)) return
+    if (placeIt || !exists || notes.length === 0 || !needsLayout(notes, qrVisible)) return
     const next = layoutNotes(notes, qrVisible)
     Promise.all(next.map((p) => moveNote(room, p.id, p.x, p.y))).catch(console.error)
-  }, [notes, qrVisible, exists, room])
+  }, [notes, qrVisible, exists, room, placeIt])
 
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const common = useMemo(() => commonWords(notes), [notes])
@@ -467,16 +524,24 @@ function Facilitator() {
     try {
       const dataUrl = await prepareBackground(file)
       setBackground(dataUrl)
-      sessionStorage.setItem('lsn_bg_' + room, dataUrl)
+      await updateRoom(room, { background_data: dataUrl })
     } catch (err) {
       console.error(err)
     }
     e.target.value = ''
   }
 
-  function removeBackground() {
+  async function removeBackground() {
     setBackground('')
-    sessionStorage.removeItem('lsn_bg_' + room)
+    await updateRoom(room, { background_data: null })
+  }
+
+  function changePrompt(value) {
+    setPromptText(value)
+    clearTimeout(promptTimerRef.current)
+    promptTimerRef.current = setTimeout(() => {
+      updateRoom(room, { prompt_text: value }).catch(console.error)
+    }, 500)
   }
 
   async function takeScreenshot() {
@@ -523,7 +588,7 @@ function Facilitator() {
         <div className="toolbar-group toolbar-left">
           <div className="room-badge"><span className="label">{t.roomCode}</span> {room}</div>
           <button className="btn btn-ghost btn-sm" onClick={() => setQrVisible((v) => !v)}>{qrVisible ? t.hideQr : t.showQr}</button>
-          {qrVisible && (
+          {!placeIt && qrVisible && (
             <div className="qr-popover">
               <QRCodeSVG value={joinUrl} size={168} />
               <div className="code">{room}</div>
@@ -547,36 +612,89 @@ function Facilitator() {
         </div>
       </div>
 
-      <div
-        ref={boardRef}
-        className="board"
-        style={background ? {
-          backgroundImage: `linear-gradient(rgba(0,0,0,.08),rgba(0,0,0,.08)), url(${background})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        } : undefined}
-      >
-        {notes.length === 0 && <div className="board-empty">{t.emptyBoard}</div>}
-        {notes.map((note) => {
-          let simClass = ''
-          if (similar) {
-            const group = similar.groupByNoteId.get(note.id)
-            simClass = group === undefined ? 'sim-dim' : `sim-group-${group % 6}`
-          }
-          return (
-            <StickyNote
-              key={note.id}
-              note={note}
-              onMove={(id, x, y) => moveNote(room, id, x, y)}
-              onDelete={(id) => deleteNote(room, id)}
-              simClass={simClass}
-              common={common}
-            />
-          )
-        })}
-        {similar && <div className="similarity-banner">{t.similarGroupsFound(similar.groupCount)}</div>}
-      </div>
+      {placeIt ? (
+        <div className="place-it-shell">
+          <aside className="place-it-rail">
+            {qrVisible && (
+              <div className="qr-card-static">
+                <QRCodeSVG value={joinUrl} size={168} />
+                <div className="code">{room}</div>
+                <p>{t.scanToJoin}</p>
+              </div>
+            )}
+            <div className="prompt-panel">
+              <div className="prompt-panel-label">{t.promptPanel}</div>
+              <textarea
+                value={promptText}
+                onChange={(e) => changePrompt(e.target.value)}
+                placeholder={t.promptPlaceholder}
+              />
+            </div>
+          </aside>
+          <div
+            ref={boardRef}
+            className="board place-it-board"
+            style={background ? {
+              backgroundImage: `url(${background})`,
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundColor: '#fff',
+            } : { backgroundColor: '#fff', backgroundImage: 'none' }}
+          >
+            {notes.length === 0 && <div className="board-empty place-it-empty">{t.emptyBoard}</div>}
+            {notes.map((note) => {
+              let simClass = ''
+              if (similar) {
+                const group = similar.groupByNoteId.get(note.id)
+                simClass = group === undefined ? 'sim-dim' : `sim-group-${group % 6}`
+              }
+              return (
+                <StickyNote
+                  key={note.id}
+                  note={note}
+                  onMove={(id, x, y) => moveNote(room, id, x, y)}
+                  onDelete={(id) => deleteNote(room, id)}
+                  simClass={simClass}
+                  common={common}
+                />
+              )
+            })}
+            {similar && <div className="similarity-banner">{t.similarGroupsFound(similar.groupCount)}</div>}
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={boardRef}
+          className="board"
+          style={background ? {
+            backgroundImage: `linear-gradient(rgba(0,0,0,.08),rgba(0,0,0,.08)), url(${background})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          } : undefined}
+        >
+          {notes.length === 0 && <div className="board-empty">{t.emptyBoard}</div>}
+          {notes.map((note) => {
+            let simClass = ''
+            if (similar) {
+              const group = similar.groupByNoteId.get(note.id)
+              simClass = group === undefined ? 'sim-dim' : `sim-group-${group % 6}`
+            }
+            return (
+              <StickyNote
+                key={note.id}
+                note={note}
+                onMove={(id, x, y) => moveNote(room, id, x, y)}
+                onDelete={(id) => deleteNote(room, id)}
+                simClass={simClass}
+                common={common}
+              />
+            )
+          })}
+          {similar && <div className="similarity-banner">{t.similarGroupsFound(similar.groupCount)}</div>}
+        </div>
+      )}
 
       {clearOpen && (
         <div className="clear-modal-backdrop" onClick={() => setClearOpen(false)}>
@@ -631,6 +749,7 @@ function Participant() {
   const room = code.toUpperCase()
   const { t, lang } = useLang()
   const [exists, setExists] = useState(null)
+  const [roomConfig, setRoomConfig] = useState(null)
   const [connectionError, setConnectionError] = useState('')
   const [participant, setParticipant] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem(participantKey(room))) } catch { return null }
@@ -644,10 +763,18 @@ function Participant() {
   const [postError, setPostError] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
+  const [placement, setPlacement] = useState(null)
 
   useEffect(() => {
-    roomExists(room).then(setExists).catch((e) => { setConnectionError(e.message); setExists(false) })
+    getRoom(room)
+      .then((data) => { setRoomConfig(data); setExists(Boolean(data)) })
+      .catch((e) => { setConnectionError(e.message); setExists(false) })
   }, [room])
+
+  useEffect(() => {
+    if (!exists) return
+    return subscribeToRoom(room, (data) => data && setRoomConfig(data))
+  }, [room, exists])
 
   useEffect(() => {
     if (participant && exists) return subscribeToNotes(room, setNotes)
@@ -665,6 +792,16 @@ function Participant() {
   }, [])
 
   const myNotes = useMemo(() => notes.filter((n) => n.participant_id === participant?.id), [notes, participant])
+  const placeItMode = roomConfig?.mode === 'place_it'
+
+  function choosePlacement(e) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const rx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    const ry = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height))
+    const x = Math.max(0, Math.min(810, Math.round(rx * 1000 - 95)))
+    const y = Math.max(0, Math.min(550, Math.round(ry * 700 - 75)))
+    setPlacement({ x, y, rx, ry })
+  }
 
   function saveName(e) {
     e.preventDefault()
@@ -688,8 +825,12 @@ function Participant() {
         text: trimmed,
         color,
         lang,
+        mode: roomConfig?.mode || 'grouped',
+        x: placement?.x,
+        y: placement?.y,
       })
       setText('')
+      if (placeItMode) setPlacement(null)
     } catch (e) {
       setPostError(e.message || 'Failed to post. Please try again.')
     } finally {
@@ -751,8 +892,27 @@ function Participant() {
             <span>{remaining} {t.charactersLeft}</span><span>{text.length}/{MAX_CHARS}</span>
           </div>
           <ColorPicker value={color} onChange={setColor} />
+          {placeItMode && (
+            <div className="placement-section">
+              <div className="placement-title">{t.choosePosition}</div>
+              <div
+                className="placement-picker"
+                onClick={choosePlacement}
+                style={roomConfig?.background_data ? {
+                  backgroundImage: `url(${roomConfig.background_data})`,
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                } : undefined}
+              >
+                {!roomConfig?.background_data && <span className="placement-hint">{t.positionHint}</span>}
+                {placement && <span className="placement-marker" style={{ left: `${placement.rx * 100}%`, top: `${placement.ry * 100}%` }} />}
+              </div>
+              <div className="placement-status">{placement ? t.positionSelected : t.positionHint}</div>
+            </div>
+          )}
           {postError && <div className="post-error">⚠ {postError}</div>}
-          <button className="btn btn-primary post-btn" disabled={!text.trim() || over || posting}>{posting ? '…' : t.postNote}</button>
+          <button className="btn btn-primary post-btn" disabled={!text.trim() || over || posting || (placeItMode && !placement)}>{posting ? '…' : t.postNote}</button>
         </form>
 
         <div className="my-notes">
