@@ -75,7 +75,7 @@ export function subscribeToRoom(code, onChange) {
   }
 }
 
-export async function addNote(code, { participantId, participantName, text, color, lang, x, y, mode = 'grouped' }) {
+export async function addNote(code, { participantId, participantName, text, color, lang, x, y, xRatio, yRatio, mode = 'grouped' }) {
   let xPosition = x
   let yPosition = y
 
@@ -104,6 +104,8 @@ export async function addNote(code, { participantId, participantName, text, colo
       lang,
       x_position: xPosition,
       y_position: yPosition,
+      x_ratio: mode === 'place_it' && Number.isFinite(xRatio) ? xRatio : null,
+      y_ratio: mode === 'place_it' && Number.isFinite(yRatio) ? yRatio : null,
       rotation: Math.random() * 4 - 2,
     })
     .select()
@@ -138,18 +140,81 @@ export async function deleteNote(code, noteId) {
   if (error) console.error(error)
 }
 
-export async function moveNote(code, noteId, x, y) {
+export async function moveNote(code, noteId, x, y, xRatio = null, yRatio = null) {
+  const changes = { x_position: x, y_position: y }
+  if (Number.isFinite(xRatio) && Number.isFinite(yRatio)) {
+    changes.x_ratio = Math.min(1, Math.max(0, xRatio))
+    changes.y_ratio = Math.min(1, Math.max(0, yRatio))
+  }
   const { error } = await supabase
     .from('notes')
-    .update({ x_position: x, y_position: y })
+    .update(changes)
     .eq('id', noteId)
     .eq('room_code', code)
   if (error) console.error(error)
 }
 
 export async function clearRoom(code) {
-  const { error } = await supabase.from('notes').delete().eq('room_code', code)
+  const { data, error } = await supabase
+    .from('notes')
+    .delete()
+    .eq('room_code', code)
+    .select('id')
   if (error) throw new Error('clearRoom: ' + error.message)
+  return data || []
+}
+
+export async function listBackgrounds() {
+  const { data, error } = await supabase
+    .from('sticky_backgrounds')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw new Error('listBackgrounds: ' + error.message)
+  return data || []
+}
+
+export async function uploadBackground(file) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+  const safeBase = file.name
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-zA-Z0-9-_]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50) || 'background'
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeBase}.${ext}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('sticky-backgrounds')
+    .upload(path, file, { cacheControl: '3600', upsert: false })
+  if (uploadError) throw new Error('uploadBackground: ' + uploadError.message)
+
+  const { data: publicData } = supabase.storage.from('sticky-backgrounds').getPublicUrl(path)
+  const publicUrl = publicData.publicUrl
+
+  const { data, error } = await supabase
+    .from('sticky_backgrounds')
+    .insert({ name: file.name, path, public_url: publicUrl })
+    .select()
+    .single()
+
+  if (error) {
+    await supabase.storage.from('sticky-backgrounds').remove([path])
+    throw new Error('saveBackground: ' + error.message)
+  }
+  return data
+}
+
+export async function deleteBackgroundAsset(background) {
+  if (!background?.id || !background?.path) return
+  const { error: storageError } = await supabase.storage
+    .from('sticky-backgrounds')
+    .remove([background.path])
+  if (storageError) throw new Error('deleteBackgroundAsset: ' + storageError.message)
+
+  const { error } = await supabase
+    .from('sticky_backgrounds')
+    .delete()
+    .eq('id', background.id)
+  if (error) throw new Error('deleteBackgroundRecord: ' + error.message)
 }
 
 export function subscribeToNotes(code, onChange) {
