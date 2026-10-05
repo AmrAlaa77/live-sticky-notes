@@ -8,6 +8,8 @@ import {
   createRoom,
   deleteNote,
   deleteParticipantNote,
+  deleteBackgroundAsset,
+  listBackgrounds,
   moveNote,
   getRoom,
   roomExists,
@@ -15,6 +17,7 @@ import {
   subscribeToRoom,
   updateParticipantNote,
   updateRoom,
+  uploadBackground,
 } from './supabase'
 
 const I18N = {
@@ -58,6 +61,12 @@ const I18N = {
     background: 'Background',
     changeBackground: 'Change background',
     removeBackground: 'Remove background',
+    backgroundLibrary: 'Background Library',
+    uploadNewBackground: 'Upload new picture',
+    savedBackgrounds: 'Saved pictures',
+    useBackground: 'Use',
+    deleteFromLibrary: 'Delete',
+    noSavedBackgrounds: 'No saved pictures yet.',
     screenshot: 'Screenshot',
     promptPanel: 'Facilitator prompt',
     promptPlaceholder: 'Paste your text, facts, steps or instructions here…',
@@ -112,6 +121,12 @@ const I18N = {
     background: 'الخلفية',
     changeBackground: 'تغيير الخلفية',
     removeBackground: 'إزالة الخلفية',
+    backgroundLibrary: 'مكتبة الخلفيات',
+    uploadNewBackground: 'رفع صورة جديدة',
+    savedBackgrounds: 'الصور المحفوظة',
+    useBackground: 'استخدام',
+    deleteFromLibrary: 'حذف',
+    noSavedBackgrounds: 'لا توجد صور محفوظة حتى الآن.',
     screenshot: 'لقطة شاشة',
     promptPanel: 'نص الميسّر',
     promptPlaceholder: 'الصق النص أو الحقائق أو الخطوات أو التعليمات هنا…',
@@ -314,30 +329,6 @@ function findSimilar(notes) {
   return { groupByNoteId, groupCount }
 }
 
-function prepareBackground(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = reject
-    reader.onload = () => {
-      const img = new Image()
-      img.onerror = reject
-      img.onload = () => {
-        const maxW = 1920
-        const maxH = 1080
-        const scale = Math.min(1, maxW / img.width, maxH / img.height)
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(img.width * scale))
-        canvas.height = Math.max(1, Math.round(img.height * scale))
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.86))
-      }
-      img.src = reader.result
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
 function layoutNotes(notes, qrVisible) {
   const groups = { yellow: [], pink: [], blue: [], green: [] }
   notes.forEach((n) => (groups[n.color] || groups.yellow).push(n))
@@ -376,7 +367,7 @@ function needsLayout(notes, qrVisible) {
   return false
 }
 
-function StickyNote({ note, onMove, onDelete, simClass, common }) {
+function StickyNote({ note, onMove, onDelete, simClass, common, normalized = false }) {
   const [dragging, setDragging] = useState(false)
   const ref = useRef(null)
   const drag = useRef(null)
@@ -392,8 +383,8 @@ function StickyNote({ note, onMove, onDelete, simClass, common }) {
     drag.current = {
       startX: e.clientX,
       startY: e.clientY,
-      originX: Number(pos.current.x) || 0,
-      originY: Number(pos.current.y) || 0,
+      originX: ref.current?.offsetLeft ?? (Number(pos.current.x) || 0),
+      originY: ref.current?.offsetTop ?? (Number(pos.current.y) || 0),
     }
     setDragging(true)
   }
@@ -423,8 +414,8 @@ function StickyNote({ note, onMove, onDelete, simClass, common }) {
       data-color={note.color}
       data-lang={note.lang}
       style={{
-        left: note.x_position,
-        top: note.y_position,
+        left: normalized && Number.isFinite(note.x_ratio) ? `calc(${note.x_ratio * 100}% - 95px)` : note.x_position,
+        top: normalized && Number.isFinite(note.y_ratio) ? `calc(${note.y_ratio * 100}% - 75px)` : note.y_position,
         transform: `rotate(${note.rotation || 0}deg)`,
         boxShadow: dragging ? '0 14px 26px rgba(0,0,0,.35)' : '3px 6px 10px rgba(0,0,0,.28)',
       }}
@@ -454,6 +445,9 @@ function Facilitator() {
   const [similar, setSimilar] = useState(null)
   const [background, setBackground] = useState('')
   const [promptText, setPromptText] = useState('')
+  const [backgroundLibrary, setBackgroundLibrary] = useState([])
+  const [backgroundOpen, setBackgroundOpen] = useState(false)
+  const [backgroundBusy, setBackgroundBusy] = useState(false)
   const promptTimerRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
@@ -510,25 +504,65 @@ function Facilitator() {
 
   async function clearAll() {
     await clearRoom(room)
+    setNotes([])
     setClearOpen(false)
     setSimilar(null)
+  }
+
+  async function refreshBackgroundLibrary() {
+    try {
+      setBackgroundLibrary(await listBackgrounds())
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  async function openBackgroundLibrary() {
+    setBackgroundOpen(true)
+    await refreshBackgroundLibrary()
   }
 
   async function chooseBackground(e) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       e.target.value = ''
       return
     }
+    setBackgroundBusy(true)
     try {
-      const dataUrl = await prepareBackground(file)
-      setBackground(dataUrl)
-      await updateRoom(room, { background_data: dataUrl })
+      const saved = await uploadBackground(file)
+      setBackground(saved.public_url)
+      await updateRoom(room, { background_data: saved.public_url })
+      await refreshBackgroundLibrary()
+      setBackgroundOpen(false)
     } catch (err) {
       console.error(err)
+      alert(err.message || 'Could not upload background.')
+    } finally {
+      setBackgroundBusy(false)
+      e.target.value = ''
     }
-    e.target.value = ''
+  }
+
+  async function useSavedBackground(item) {
+    setBackground(item.public_url)
+    await updateRoom(room, { background_data: item.public_url })
+    setBackgroundOpen(false)
+  }
+
+  async function deleteSavedBackground(item) {
+    try {
+      await deleteBackgroundAsset(item)
+      if (background === item.public_url) {
+        setBackground('')
+        await updateRoom(room, { background_data: null })
+      }
+      await refreshBackgroundLibrary()
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Could not delete background.')
+    }
   }
 
   async function removeBackground() {
@@ -600,8 +634,8 @@ function Facilitator() {
           {similar
             ? <button className="btn btn-ghost btn-sm" onClick={() => setSimilar(null)}>{t.resetSimilarity}</button>
             : <button className="btn btn-ghost btn-sm" onClick={() => setSimilar(findSimilar(notes))}>{t.findSimilar}</button>}
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={chooseBackground} />
-          <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current?.click()}>
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={chooseBackground} />
+          <button className="btn btn-ghost btn-sm" onClick={openBackgroundLibrary}>
             {background ? t.changeBackground : t.background}
           </button>
           {background && <button className="btn btn-ghost btn-sm" onClick={removeBackground}>{t.removeBackground}</button>}
@@ -653,10 +687,17 @@ function Facilitator() {
                 <StickyNote
                   key={note.id}
                   note={note}
-                  onMove={(id, x, y) => moveNote(room, id, x, y)}
+                  onMove={(id, x, y) => {
+                    const board = boardRef.current
+                    if (!board) return moveNote(room, id, x, y)
+                    const rx = Math.min(1, Math.max(0, (x + 95) / board.clientWidth))
+                    const ry = Math.min(1, Math.max(0, (y + 75) / board.clientHeight))
+                    return moveNote(room, id, x, y, rx, ry)
+                  }}
                   onDelete={(id) => deleteNote(room, id)}
                   simClass={simClass}
                   common={common}
+                  normalized
                 />
               )
             })}
@@ -693,6 +734,37 @@ function Facilitator() {
             )
           })}
           {similar && <div className="similarity-banner">{t.similarGroupsFound(similar.groupCount)}</div>}
+        </div>
+      )}
+
+      {backgroundOpen && (
+        <div className="clear-modal-backdrop" onClick={() => setBackgroundOpen(false)}>
+          <div className="background-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="background-modal-head">
+              <h3>{t.backgroundLibrary}</h3>
+              <button className="btn btn-ghost-light btn-sm" onClick={() => setBackgroundOpen(false)}>✕</button>
+            </div>
+            <button className="btn btn-primary" disabled={backgroundBusy} onClick={() => fileRef.current?.click()}>
+              {backgroundBusy ? '…' : t.uploadNewBackground}
+            </button>
+            <div className="background-section-title">{t.savedBackgrounds}</div>
+            {backgroundLibrary.length === 0 ? (
+              <div className="background-empty">{t.noSavedBackgrounds}</div>
+            ) : (
+              <div className="background-grid">
+                {backgroundLibrary.map((item) => (
+                  <div className="background-card" key={item.id}>
+                    <img src={item.public_url} alt={item.name} />
+                    <div className="background-card-name" title={item.name}>{item.name}</div>
+                    <div className="background-card-actions">
+                      <button className="btn btn-primary btn-sm" onClick={() => useSavedBackground(item)}>{t.useBackground}</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => deleteSavedBackground(item)}>{t.deleteFromLibrary}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -798,9 +870,7 @@ function Participant() {
     const rect = e.currentTarget.getBoundingClientRect()
     const rx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
     const ry = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height))
-    const x = Math.max(0, Math.min(810, Math.round(rx * 1000 - 95)))
-    const y = Math.max(0, Math.min(550, Math.round(ry * 700 - 75)))
-    setPlacement({ x, y, rx, ry })
+    setPlacement({ rx, ry })
   }
 
   function saveName(e) {
@@ -826,8 +896,8 @@ function Participant() {
         color,
         lang,
         mode: roomConfig?.mode || 'grouped',
-        x: placement?.x,
-        y: placement?.y,
+        xRatio: placement?.rx,
+        yRatio: placement?.ry,
       })
       setText('')
       if (placeItMode) setPlacement(null)
