@@ -15,34 +15,83 @@ export function makeRoomCode(length = 6) {
   return code
 }
 
-export async function createRoom() {
+export async function createRoom(mode = 'grouped') {
   let code = makeRoomCode()
   for (;;) {
-    const { error } = await supabase.from('rooms').insert({ code })
+    const { error } = await supabase.from('rooms').insert({ code, mode })
     if (!error) return code
     if (error.code === '23505') code = makeRoomCode()
     else throw new Error('createRoom: ' + error.message)
   }
 }
 
-export async function roomExists(code) {
-  const { data, error } = await supabase.from('rooms').select('code').eq('code', code).maybeSingle()
-  if (error) throw new Error('roomExists: ' + error.message)
-  return Boolean(data)
+export async function getRoom(code) {
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('code,mode,prompt_text,background_data')
+    .eq('code', code)
+    .maybeSingle()
+  if (error) throw new Error('getRoom: ' + error.message)
+  return data
 }
 
-export async function addNote(code, { participantId, participantName, text, color, lang }) {
-  const { data: sameColor } = await supabase
-    .from('notes')
-    .select('id,color')
-    .eq('room_code', code)
-    .eq('color', color)
-    .order('created_at', { ascending: true })
+export async function roomExists(code) {
+  return Boolean(await getRoom(code))
+}
 
-  const colorIndex = { yellow: 0, pink: 1, blue: 2, green: 3 }[color] ?? 0
-  const count = (sameColor || []).length
-  const x = 420 + colorIndex * 210
-  const y = 40 + count * 170
+export async function updateRoom(code, changes) {
+  const allowed = {}
+  if ('prompt_text' in changes) allowed.prompt_text = changes.prompt_text
+  if ('background_data' in changes) allowed.background_data = changes.background_data
+  if ('mode' in changes) allowed.mode = changes.mode
+  const { data, error } = await supabase
+    .from('rooms')
+    .update(allowed)
+    .eq('code', code)
+    .select('code,mode,prompt_text,background_data')
+    .single()
+  if (error) throw new Error('updateRoom: ' + error.message)
+  return data
+}
+
+export function subscribeToRoom(code, onChange) {
+  let active = true
+
+  async function refresh() {
+    const room = await getRoom(code)
+    if (active) onChange(room)
+  }
+
+  refresh().catch(console.error)
+
+  const channel = supabase
+    .channel('room-config-' + code)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: 'code=eq.' + code }, refresh)
+    .subscribe()
+
+  return () => {
+    active = false
+    supabase.removeChannel(channel)
+  }
+}
+
+export async function addNote(code, { participantId, participantName, text, color, lang, x, y, mode = 'grouped' }) {
+  let xPosition = x
+  let yPosition = y
+
+  if (mode !== 'place_it' || !Number.isFinite(xPosition) || !Number.isFinite(yPosition)) {
+    const { data: sameColor } = await supabase
+      .from('notes')
+      .select('id,color')
+      .eq('room_code', code)
+      .eq('color', color)
+      .order('created_at', { ascending: true })
+
+    const colorIndex = { yellow: 0, pink: 1, blue: 2, green: 3 }[color] ?? 0
+    const count = (sameColor || []).length
+    xPosition = 420 + colorIndex * 210
+    yPosition = 40 + count * 170
+  }
 
   const { data, error } = await supabase
     .from('notes')
@@ -53,8 +102,8 @@ export async function addNote(code, { participantId, participantName, text, colo
       text,
       color,
       lang,
-      x_position: x,
-      y_position: y,
+      x_position: xPosition,
+      y_position: yPosition,
       rotation: Math.random() * 4 - 2,
     })
     .select()
