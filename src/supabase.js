@@ -79,7 +79,10 @@ export async function addNote(code, { participantId, participantName, text, colo
   let xPosition = x
   let yPosition = y
 
-  if (mode !== 'place_it' || !Number.isFinite(xPosition) || !Number.isFinite(yPosition)) {
+  if (mode === 'place_it' && Number.isFinite(xRatio) && Number.isFinite(yRatio)) {
+    xPosition = Number.isFinite(xPosition) ? xPosition : Math.max(0, Math.round(xRatio * 1000 - 95))
+    yPosition = Number.isFinite(yPosition) ? yPosition : Math.max(0, Math.round(yRatio * 562.5 - 75))
+  } else {
     const { data: sameColor } = await supabase
       .from('notes')
       .select('id,color')
