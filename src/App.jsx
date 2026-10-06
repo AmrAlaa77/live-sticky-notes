@@ -707,6 +707,7 @@ function SuperstarFacilitator({ room, roomConfig }) {
       await updateRoom(room, { background_data: uploaded.public_url })
       setBackgroundUrl(uploaded.public_url)
       setBackgroundMessage(t.backgroundSaved)
+      window.setTimeout(() => setBackgroundMessage(''), 2500)
     } catch (error) {
       console.error('Superstar background upload:', error)
       setBackgroundMessage(t.backgroundUploadError)
@@ -759,7 +760,7 @@ function SuperstarFacilitator({ room, roomConfig }) {
           {qrVisible && (
             <div className="superstar-qr-card">
               <div className="superstar-qr-title">{t.scanToJoin}</div>
-              <QRCodeSVG value={joinUrl} size={132} fgColor="#5b3900" bgColor="#fff7e2" level="H" includeMargin />
+              <QRCodeSVG value={joinUrl} size={116} fgColor="#5b3900" bgColor="#fff7e2" level="H" includeMargin />
               <div className="superstar-qr-code">{room}</div>
             </div>
           )}
@@ -788,8 +789,8 @@ function SuperstarFacilitator({ room, roomConfig }) {
           </div>
         </div>
         <div className="superstar-main-panel" style={{ backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : 'none' }}>
-          <div className="superstar-main-label">{leaderboard.leaders.length > 1 ? t.tiedSuperstars : t.currentSuperstar}</div>
-          <div className="superstar-winners-slot">
+          <div className={`superstar-main-label ${leaderboard.leaders.length === 0 ? 'is-empty' : ''}`}>{leaderboard.leaders.length > 1 ? t.tiedSuperstars : t.currentSuperstar}</div>
+          <div className={`superstar-winners-slot ${leaderboard.leaders.length === 0 ? 'is-empty' : ''}`}>
             {leaderboard.leaders.length === 0 ? (
               <div className="superstar-winner-empty">{t.noSubmissionsYet}</div>
             ) : (
