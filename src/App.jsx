@@ -674,7 +674,7 @@ function SuperstarFacilitator({ room, roomConfig }) {
   const [clearOpen, setClearOpen] = useState(false)
   const [backgroundUploading, setBackgroundUploading] = useState(false)
   const [backgroundMessage, setBackgroundMessage] = useState('')
-  const [backgroundUrl, setBackgroundUrl] = useState(roomConfig?.background_data || superstarBanner)
+  const [backgroundUrl, setBackgroundUrl] = useState(roomConfig?.background_data || '')
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
@@ -683,7 +683,7 @@ function SuperstarFacilitator({ room, roomConfig }) {
 
   useEffect(() => subscribeToSuperstarSubmissions(room, setSubmissions), [room])
   useEffect(() => {
-    if (roomConfig?.background_data) setBackgroundUrl(roomConfig.background_data)
+    setBackgroundUrl(roomConfig?.background_data || '')
   }, [roomConfig?.background_data])
   useEffect(() => {
     const handler = () => setFullscreen(Boolean(document.fullscreenElement))
@@ -787,8 +787,7 @@ function SuperstarFacilitator({ room, roomConfig }) {
             {submissions.map((item) => <SuperstarFeedCard key={item.id} item={item} compact />)}
           </div>
         </div>
-        <div className="superstar-main-panel" style={{ backgroundImage: `url(${backgroundUrl})` }}>
-          <div className="superstar-hero-title"><span className="small">The</span><span className="big">Superstar</span></div>
+        <div className="superstar-main-panel" style={{ backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : 'none' }}>
           <div className="superstar-main-label">{leaderboard.leaders.length > 1 ? t.tiedSuperstars : t.currentSuperstar}</div>
           <div className="superstar-winners-slot">
             {leaderboard.leaders.length === 0 ? (
