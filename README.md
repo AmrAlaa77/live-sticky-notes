@@ -14,6 +14,7 @@ Editable Vite/React source reconstructed from the latest working deployment and 
 - Live common-word highlighting
 - Find Similar
 - Background image upload / change / remove on facilitator board
+- Screenshot export of full notes board
 
 ## Run locally
 ```

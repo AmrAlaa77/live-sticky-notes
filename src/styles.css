@@ -79,7 +79,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .placement-marker{position:absolute;width:22px;height:22px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 2px var(--accent),0 2px 8px #0004;transform:translate(-50%,-50%);z-index:2}
 .placement-status{font-size:.76rem;color:var(--ink-soft)}
 @media(max-width:900px){.place-it-shell{grid-template-columns:240px minmax(760px,1fr)}.place-it-rail{min-height:0}}
-
 .background-modal{width:min(900px,92vw);max-height:86vh;overflow:auto;background:#fff;border-radius:12px;padding:22px;box-shadow:0 22px 60px #0006}
 .background-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
 .background-modal-head h3{margin:0;font-size:1.2rem}
@@ -91,3 +90,34 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .background-card-name{padding:10px 10px 4px;font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .background-card-actions{display:flex;gap:8px;padding:8px 10px 12px}
 .background-card-actions .btn{flex:1}
+
+/* Superstar mode */
+.superstar-stage{flex:1;min-height:0;display:grid;grid-template-columns:320px minmax(0,1fr);gap:0;background:#120700;overflow:hidden}
+.superstar-feed-column{background:linear-gradient(180deg,#7a4200,#d08412 52%,#7a4200);padding:14px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.superstar-qr-card{background:#0e5e84;color:#fff;border:2px solid rgba(0,0,0,.28);border-radius:24px;padding:16px 14px;text-align:center;box-shadow:0 10px 20px rgba(0,0,0,.25)}
+.superstar-qr-title{font-size:1.1rem;font-weight:800;margin-bottom:10px}
+.superstar-qr-code{font-size:1.25rem;font-weight:800;letter-spacing:.12em;margin-top:10px}
+.superstar-feed-title{color:#fff;font-size:1rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding-inline:4px}
+.superstar-feed-list{display:flex;flex-direction:column;gap:12px;overflow:auto;padding-right:2px}
+.superstar-feed-empty{background:rgba(255,255,255,.15);color:#fff;border:1px dashed rgba(255,255,255,.35);border-radius:16px;padding:18px;line-height:1.5}
+.superstar-card{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 12px 22px rgba(0,0,0,.18);border:1px solid rgba(0,0,0,.06)}
+.superstar-card-compact{border-radius:22px}
+.superstar-card-photo{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#ececec}
+.superstar-card-body{padding:12px 14px 14px}
+.superstar-card-names{font-size:1rem;font-weight:800;color:#1f2937;line-height:1.3;margin-bottom:8px}
+.superstar-card-lesson-label{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#b45309;margin-bottom:4px}
+.superstar-card-lesson{font-size:.92rem;color:#374151;line-height:1.45;white-space:pre-wrap}
+.superstar-main-panel{position:relative;background-position:center;background-repeat:no-repeat;background-size:cover;min-height:720px}
+.superstar-main-panel:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.08))}
+.superstar-main-label{position:absolute;top:18px;left:24px;z-index:2;background:rgba(35,25,7,.5);color:#fff;padding:10px 16px;border-radius:999px;font-weight:800;backdrop-filter:blur(6px)}
+.superstar-winners-slot{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:8% 13% 11% 42%}
+.superstar-winner-empty{z-index:2;background:rgba(255,255,255,.2);color:#fff;border:1px dashed rgba(255,255,255,.5);backdrop-filter:blur(8px);padding:22px;border-radius:18px;text-align:center;max-width:320px}
+.superstar-winners-grid{position:relative;z-index:2;display:grid;gap:14px;width:min(520px,100%)}
+.superstar-winners-1{grid-template-columns:1fr;max-width:270px}.superstar-winners-2{grid-template-columns:1fr 1fr;max-width:430px}.superstar-winners-3,.superstar-winners-4{grid-template-columns:1fr 1fr;max-width:430px}
+.superstar-winner-card{background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.85);border-radius:20px;padding:8px;backdrop-filter:blur(6px);box-shadow:0 12px 28px rgba(0,0,0,.25)}
+.superstar-winner-photo{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;background:#f4dba2}
+.superstar-winner-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#fff;padding:10px 4px 2px}
+.superstar-winner-name{font-weight:800;line-height:1.2;font-size:.96rem}.superstar-winner-score{min-width:34px;height:34px;border-radius:999px;background:#fff;color:#8b5a00;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:900}
+.superstar-preview{display:block;width:100%;max-height:280px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#f3f4f6}
+@media (max-width: 1100px){.superstar-stage{grid-template-columns:280px minmax(0,1fr)}.superstar-winners-slot{padding:10% 10% 10% 38%}}
+@media (max-width: 900px){.superstar-stage{grid-template-columns:1fr}.superstar-feed-column{max-height:48vh}.superstar-main-panel{min-height:540px}.superstar-winners-slot{padding:22% 12% 18% 12%}.superstar-main-label{top:14px;left:14px}}

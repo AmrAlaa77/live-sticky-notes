@@ -2,22 +2,21 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import html2canvas from 'html2canvas'
+import superstarBanner from './assets/superstar-banner.webp'
 import {
   addNote,
+  addSuperstarSubmission,
   clearRoom,
   createRoom,
   deleteNote,
   deleteParticipantNote,
-  deleteBackgroundAsset,
-  listBackgrounds,
-  moveNote,
   getRoom,
+  moveNote,
   roomExists,
   subscribeToNotes,
   subscribeToRoom,
+  subscribeToSuperstarSubmissions,
   updateParticipantNote,
-  updateRoom,
-  uploadBackground,
 } from './supabase'
 
 const I18N = {
@@ -28,9 +27,11 @@ const I18N = {
     createRoom: 'Create room',
     chooseMode: 'Choose a mode',
     groupedMode: 'Grouped Sticky Notes',
-    groupedDesc: 'Automatically arrange notes and group them by color.',
+    groupedDesc: 'Automatically stack sticky notes by color.',
     placeItMode: 'Place It',
-    placeItDesc: 'Participants choose exactly where their note appears on the canvas.',
+    placeItDesc: 'Participants choose where their note appears on the board.',
+    superstarMode: 'Superstar',
+    superstarDesc: 'Upload selfie pairs, lessons learned, and compete to stay in the Superstar frame.',
     participantJoinHint: 'Have a room code? Join from your phone.',
     enterRoomCode: 'Enter room code',
     join: 'Join',
@@ -58,28 +59,33 @@ const I18N = {
     fullscreen: 'Fullscreen',
     exitFullscreen: 'Exit fullscreen',
     clearScreen: 'Clear screen',
-    background: 'Background',
-    changeBackground: 'Change background',
-    removeBackground: 'Remove background',
-    backgroundLibrary: 'Background Library',
-    uploadNewBackground: 'Upload new picture',
-    savedBackgrounds: 'Saved pictures',
-    useBackground: 'Use',
-    deleteFromLibrary: 'Delete',
-    noSavedBackgrounds: 'No saved pictures yet.',
     screenshot: 'Screenshot',
-    promptPanel: 'Facilitator prompt',
-    promptPlaceholder: 'Paste your text, facts, steps or instructions here…',
-    choosePosition: 'Choose where your note should appear',
-    positionHint: 'Tap anywhere on the canvas preview.',
-    positionSelected: 'Position selected',
-    clearConfirmTitle: 'Clear all sticky notes?',
-    clearConfirmBody: 'This removes every note from this room.',
+    clearConfirmTitle: 'Clear the room?',
+    clearConfirmBody: 'This removes all content from this room.',
     clearAll: 'Clear all',
     findSimilar: 'Find similar',
     resetSimilarity: 'Reset similarity',
     emptyBoard: 'Notes will appear here as participants post them.',
     similarGroupsFound: (n) => n === 0 ? 'No clearly similar notes found.' : `${n} similar ${n === 1 ? 'group' : 'groups'} highlighted.`,
+    choosePosition: 'Choose where your note should appear',
+    positionHint: 'Tap anywhere on the board preview.',
+    positionSelected: 'Position selected',
+    peerName: 'Peer name',
+    peerPlaceholder: 'e.g. Ahmed',
+    lessonLabel: 'Lesson learned',
+    lessonPlaceholder: 'What lesson did you learn from the session?',
+    choosePhoto: 'Choose a selfie together',
+    submitSelfie: 'Submit selfie',
+    selfieRequired: 'Please choose a photo before submitting.',
+    duplicatePairError: 'This pair has already submitted in this room.',
+    sameNameError: 'Your name and your peer name must be different.',
+    superstarEmpty: 'Selfies will appear here as participants upload them.',
+    currentSuperstar: 'Current Superstar',
+    tiedSuperstars: 'Tied Superstars',
+    liveFeed: 'Live Feed',
+    lessonLearned: 'Lesson',
+    pairCount: 'Entries by you',
+    noSubmissionsYet: 'No selfie submissions yet.',
   },
   ar: {
     appName: 'الملاحظات اللاصقة الحية',
@@ -88,10 +94,12 @@ const I18N = {
     createRoom: 'إنشاء غرفة',
     chooseMode: 'اختر الوضع',
     groupedMode: 'الملاحظات المجمّعة',
-    groupedDesc: 'ترتيب الملاحظات تلقائيًا وتجميعها حسب اللون.',
+    groupedDesc: 'ترتيب الملاحظات تلقائيًا بحسب اللون.',
     placeItMode: 'Place It',
-    placeItDesc: 'يختار المشاركون المكان الذي تظهر فيه ملاحظتهم على اللوحة.',
-    participantJoinHint: 'لديك رمز غرفة؟ انضم من هاتفك.',
+    placeItDesc: 'المشاركون يختارون مكان ظهور الملاحظة على اللوحة.',
+    superstarMode: 'Superstar',
+    superstarDesc: 'رفع سيلفي ثنائي مع الدروس المستفادة والتنافس للبقاء داخل إطار النجم.',
+    participantJoinHint: 'عندك رمز غرفة؟ انضم من جوالك.',
     enterRoomCode: 'أدخل رمز الغرفة',
     join: 'انضمام',
     yourName: 'اسمك',
@@ -118,32 +126,40 @@ const I18N = {
     fullscreen: 'ملء الشاشة',
     exitFullscreen: 'إنهاء ملء الشاشة',
     clearScreen: 'مسح الشاشة',
-    background: 'الخلفية',
-    changeBackground: 'تغيير الخلفية',
-    removeBackground: 'إزالة الخلفية',
-    backgroundLibrary: 'مكتبة الخلفيات',
-    uploadNewBackground: 'رفع صورة جديدة',
-    savedBackgrounds: 'الصور المحفوظة',
-    useBackground: 'استخدام',
-    deleteFromLibrary: 'حذف',
-    noSavedBackgrounds: 'لا توجد صور محفوظة حتى الآن.',
     screenshot: 'لقطة شاشة',
-    promptPanel: 'نص الميسّر',
-    promptPlaceholder: 'الصق النص أو الحقائق أو الخطوات أو التعليمات هنا…',
-    choosePosition: 'اختر مكان ظهور ملاحظتك',
-    positionHint: 'اضغط في أي مكان على معاينة اللوحة.',
-    positionSelected: 'تم اختيار المكان',
-    clearConfirmTitle: 'مسح جميع الملاحظات؟',
-    clearConfirmBody: 'سيؤدي هذا إلى إزالة كل ملاحظة من هذه الغرفة.',
+    clearConfirmTitle: 'مسح محتوى الغرفة؟',
+    clearConfirmBody: 'سيؤدي هذا إلى إزالة كل المحتوى من هذه الغرفة.',
     clearAll: 'مسح الكل',
     findSimilar: 'ابحث عن المتشابه',
     resetSimilarity: 'إعادة ضبط التشابه',
     emptyBoard: 'ستظهر الملاحظات هنا عند نشر المشاركين لها.',
     similarGroupsFound: (n) => n === 0 ? 'لم يتم العثور على ملاحظات متشابهة.' : `تم تمييز ${n} مجموعة متشابهة.`,
+    choosePosition: 'اختر مكان ظهور ملاحظتك',
+    positionHint: 'اضغط في أي مكان على معاينة اللوحة.',
+    positionSelected: 'تم اختيار المكان',
+    peerName: 'اسم الزميل',
+    peerPlaceholder: 'مثال: أحمد',
+    lessonLabel: 'الدرس المستفاد',
+    lessonPlaceholder: 'ما الدرس الذي تعلمته من الجلسة؟',
+    choosePhoto: 'اختر سيلفي معًا',
+    submitSelfie: 'أرسل السيلفي',
+    selfieRequired: 'اختر صورة قبل الإرسال.',
+    duplicatePairError: 'هذا الثنائي أرسل مسبقًا في هذه الغرفة.',
+    sameNameError: 'لازم يكون اسمك مختلف عن اسم زميلك.',
+    superstarEmpty: 'ستظهر صور السيلفي هنا عند رفعها من المشاركين.',
+    currentSuperstar: 'النجم الحالي',
+    tiedSuperstars: 'نجوم متعادلون',
+    liveFeed: 'البث الحي',
+    lessonLearned: 'الدرس',
+    pairCount: 'مشاركاتك',
+    noSubmissionsYet: 'لا توجد مشاركات سيلفي حتى الآن.',
   },
 }
 
 const LangContext = createContext(null)
+const MAX_CHARS = 150
+const MAX_LESSON = 220
+const participantKey = (room) => 'lsn_participant_' + room
 
 function LangProvider({ children }) {
   const [lang, setLang] = useState(() => localStorage.getItem('lsn_lang') || 'en')
@@ -224,6 +240,10 @@ function Home() {
             <button type="button" className={`mode-option ${mode === 'place_it' ? 'active' : ''}`} onClick={() => setMode('place_it')}>
               <strong>{t.placeItMode}</strong>
               <span>{t.placeItDesc}</span>
+            </button>
+            <button type="button" className={`mode-option ${mode === 'superstar' ? 'active' : ''}`} onClick={() => setMode('superstar')}>
+              <strong>{t.superstarMode}</strong>
+              <span>{t.superstarDesc}</span>
             </button>
           </div>
           <button className="btn btn-primary" onClick={start} disabled={creating}>{creating ? '…' : t.createRoom}</button>
@@ -354,7 +374,6 @@ function needsLayout(notes, qrVisible) {
   const qrW = 370
   const qrH = 360
   const placed = []
-
   for (const note of notes) {
     const rect = { x: Number(note.x_position) || 0, y: Number(note.y_position) || 0, w: noteW, h: noteH }
     if (qrVisible && rect.x < qrW && rect.y < qrH) return true
@@ -431,55 +450,17 @@ function StickyNote({ note, onMove, onDelete, simClass, common, normalized = fal
   )
 }
 
-function Facilitator() {
-  const { code = '' } = useParams()
-  const room = code.toUpperCase()
+function BaseFacilitator({ room, roomConfig }) {
   const { t } = useLang()
-  const [exists, setExists] = useState(null)
-  const [roomConfig, setRoomConfig] = useState(null)
-  const [connectionError, setConnectionError] = useState('')
   const [notes, setNotes] = useState([])
   const [qrVisible, setQrVisible] = useState(true)
   const [clearOpen, setClearOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [similar, setSimilar] = useState(null)
-  const [background, setBackground] = useState('')
-  const [promptText, setPromptText] = useState('')
-  const [backgroundLibrary, setBackgroundLibrary] = useState([])
-  const [backgroundOpen, setBackgroundOpen] = useState(false)
-  const [backgroundBusy, setBackgroundBusy] = useState(false)
-  const promptTimerRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
-  const fileRef = useRef(null)
 
-  useEffect(() => {
-    getRoom(room)
-      .then((data) => {
-        setRoomConfig(data)
-        setExists(Boolean(data))
-        if (data) {
-          setBackground(data.background_data || '')
-          setPromptText(data.prompt_text || '')
-        }
-      })
-      .catch((e) => { setConnectionError(e.message); setExists(false) })
-  }, [room])
-
-  useEffect(() => {
-    if (!exists) return
-    return subscribeToRoom(room, (data) => {
-      if (!data) return
-      setRoomConfig(data)
-      setBackground(data.background_data || '')
-      setPromptText((current) => current === (roomConfig?.prompt_text || '') ? (data.prompt_text || '') : current)
-    })
-  }, [room, exists])
-
-  useEffect(() => {
-    if (exists) return subscribeToNotes(room, setNotes)
-  }, [room, exists])
-
+  useEffect(() => subscribeToNotes(room, setNotes), [room])
   useEffect(() => {
     const handler = () => setFullscreen(Boolean(document.fullscreenElement))
     document.addEventListener('fullscreenchange', handler)
@@ -487,12 +468,11 @@ function Facilitator() {
   }, [])
 
   const placeIt = roomConfig?.mode === 'place_it'
-
   useEffect(() => {
-    if (placeIt || !exists || notes.length === 0 || !needsLayout(notes, qrVisible)) return
+    if (placeIt || notes.length === 0 || !needsLayout(notes, qrVisible)) return
     const next = layoutNotes(notes, qrVisible)
     Promise.all(next.map((p) => moveNote(room, p.id, p.x, p.y))).catch(console.error)
-  }, [notes, qrVisible, exists, room, placeIt])
+  }, [notes, qrVisible, room, placeIt])
 
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const common = useMemo(() => commonWords(notes), [notes])
@@ -509,112 +489,25 @@ function Facilitator() {
     setSimilar(null)
   }
 
-  async function refreshBackgroundLibrary() {
-    try {
-      setBackgroundLibrary(await listBackgrounds())
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  async function openBackgroundLibrary() {
-    setBackgroundOpen(true)
-    await refreshBackgroundLibrary()
-  }
-
-  async function chooseBackground(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      e.target.value = ''
-      return
-    }
-    setBackgroundBusy(true)
-    try {
-      const saved = await uploadBackground(file)
-      setBackground(saved.public_url)
-      await updateRoom(room, { background_data: saved.public_url })
-      await refreshBackgroundLibrary()
-      setBackgroundOpen(false)
-    } catch (err) {
-      console.error(err)
-      alert(err.message || 'Could not upload background.')
-    } finally {
-      setBackgroundBusy(false)
-      e.target.value = ''
-    }
-  }
-
-  async function useSavedBackground(item) {
-    setBackground(item.public_url)
-    await updateRoom(room, { background_data: item.public_url })
-    setBackgroundOpen(false)
-  }
-
-  async function deleteSavedBackground(item) {
-    try {
-      await deleteBackgroundAsset(item)
-      if (background === item.public_url) {
-        setBackground('')
-        await updateRoom(room, { background_data: null })
-      }
-      await refreshBackgroundLibrary()
-    } catch (err) {
-      console.error(err)
-      alert(err.message || 'Could not delete background.')
-    }
-  }
-
-  async function removeBackground() {
-    setBackground('')
-    await updateRoom(room, { background_data: null })
-  }
-
-  function changePrompt(value) {
-    setPromptText(value)
-    clearTimeout(promptTimerRef.current)
-    promptTimerRef.current = setTimeout(() => {
-      updateRoom(room, { prompt_text: value }).catch(console.error)
-    }, 500)
-  }
-
   async function takeScreenshot() {
     const board = boardRef.current
     if (!board) return
-    try {
-      const canvas = await html2canvas(board, {
-        backgroundColor: null,
-        useCORS: true,
-        scale: Math.min(2, window.devicePixelRatio || 1.5),
-        width: board.scrollWidth,
-        height: board.scrollHeight,
-        windowWidth: board.scrollWidth,
-        windowHeight: board.scrollHeight,
-        scrollX: 0,
-        scrollY: 0,
-      })
-      const link = document.createElement('a')
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-      link.download = `live-sticky-notes-${room}-${stamp}.png`
-      link.href = canvas.toDataURL('image/png')
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-    } catch (err) {
-      console.error('Screenshot failed:', err)
-      alert('Could not create screenshot. Please try again.')
-    }
+    const canvas = await html2canvas(board, {
+      backgroundColor: null,
+      useCORS: true,
+      scale: Math.min(2, window.devicePixelRatio || 1.5),
+      width: board.scrollWidth,
+      height: board.scrollHeight,
+      windowWidth: board.scrollWidth,
+      windowHeight: board.scrollHeight,
+    })
+    const link = document.createElement('a')
+    link.download = `live-sticky-notes-${room}.png`
+    link.href = canvas.toDataURL('image/png')
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
   }
-
-  if (exists === null) return <div className="home"><div className="home-card"><p>Loading…</p></div></div>
-  if (!exists) return (
-    <div className="home">
-      <div className="home-card">
-        <h2>{connectionError ? 'Connection error' : t.roomNotFound}</h2>
-        {connectionError && <p className="error-text">{connectionError}</p>}
-      </div>
-    </div>
-  )
 
   return (
     <div className="facilitator" ref={containerRef}>
@@ -634,11 +527,6 @@ function Facilitator() {
           {similar
             ? <button className="btn btn-ghost btn-sm" onClick={() => setSimilar(null)}>{t.resetSimilarity}</button>
             : <button className="btn btn-ghost btn-sm" onClick={() => setSimilar(findSimilar(notes))}>{t.findSimilar}</button>}
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={chooseBackground} />
-          <button className="btn btn-ghost btn-sm" onClick={openBackgroundLibrary}>
-            {background ? t.changeBackground : t.background}
-          </button>
-          {background && <button className="btn btn-ghost btn-sm" onClick={removeBackground}>{t.removeBackground}</button>}
           <button className="btn btn-ghost btn-sm" onClick={takeScreenshot}>{t.screenshot}</button>
           <button className="btn btn-ghost btn-sm" onClick={() => setClearOpen(true)}>{t.clearScreen}</button>
           <button className="btn btn-ghost btn-sm" onClick={toggleFullscreen}>{fullscreen ? t.exitFullscreen : t.fullscreen}</button>
@@ -646,127 +534,35 @@ function Facilitator() {
         </div>
       </div>
 
-      {placeIt ? (
-        <div className="place-it-shell">
-          <aside className="place-it-rail">
-            {qrVisible && (
-              <div className="qr-card-static">
-                <QRCodeSVG value={joinUrl} size={168} />
-                <div className="code">{room}</div>
-                <p>{t.scanToJoin}</p>
-              </div>
-            )}
-            <div className="prompt-panel">
-              <div className="prompt-panel-label">{t.promptPanel}</div>
-              <textarea
-                value={promptText}
-                onChange={(e) => changePrompt(e.target.value)}
-                placeholder={t.promptPlaceholder}
-              />
-            </div>
-          </aside>
-          <div
-            ref={boardRef}
-            className="board place-it-board"
-            style={background ? {
-              backgroundImage: `url(${background})`,
-              backgroundSize: 'contain',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundColor: '#fff',
-            } : { backgroundColor: '#fff', backgroundImage: 'none' }}
-          >
-            {notes.length === 0 && <div className="board-empty place-it-empty">{t.emptyBoard}</div>}
-            {notes.map((note) => {
-              let simClass = ''
-              if (similar) {
-                const group = similar.groupByNoteId.get(note.id)
-                simClass = group === undefined ? 'sim-dim' : `sim-group-${group % 6}`
-              }
-              return (
-                <StickyNote
-                  key={note.id}
-                  note={note}
-                  onMove={(id, x, y) => {
-                    const board = boardRef.current
-                    if (!board) return moveNote(room, id, x, y)
-                    const rx = Math.min(1, Math.max(0, (x + 95) / board.clientWidth))
-                    const ry = Math.min(1, Math.max(0, (y + 75) / board.clientHeight))
-                    return moveNote(room, id, x, y, rx, ry)
-                  }}
-                  onDelete={(id) => deleteNote(room, id)}
-                  simClass={simClass}
-                  common={common}
-                  normalized
-                />
-              )
-            })}
-            {similar && <div className="similarity-banner">{t.similarGroupsFound(similar.groupCount)}</div>}
-          </div>
-        </div>
-      ) : (
-        <div
-          ref={boardRef}
-          className="board"
-          style={background ? {
-            backgroundImage: `linear-gradient(rgba(0,0,0,.08),rgba(0,0,0,.08)), url(${background})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-          } : undefined}
-        >
-          {notes.length === 0 && <div className="board-empty">{t.emptyBoard}</div>}
-          {notes.map((note) => {
-            let simClass = ''
-            if (similar) {
-              const group = similar.groupByNoteId.get(note.id)
-              simClass = group === undefined ? 'sim-dim' : `sim-group-${group % 6}`
-            }
-            return (
-              <StickyNote
-                key={note.id}
-                note={note}
-                onMove={(id, x, y) => moveNote(room, id, x, y)}
-                onDelete={(id) => deleteNote(room, id)}
-                simClass={simClass}
-                common={common}
-              />
-            )
-          })}
-          {similar && <div className="similarity-banner">{t.similarGroupsFound(similar.groupCount)}</div>}
-        </div>
-      )}
-
-      {backgroundOpen && (
-        <div className="clear-modal-backdrop" onClick={() => setBackgroundOpen(false)}>
-          <div className="background-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="background-modal-head">
-              <h3>{t.backgroundLibrary}</h3>
-              <button className="btn btn-ghost-light btn-sm" onClick={() => setBackgroundOpen(false)}>✕</button>
-            </div>
-            <button className="btn btn-primary" disabled={backgroundBusy} onClick={() => fileRef.current?.click()}>
-              {backgroundBusy ? '…' : t.uploadNewBackground}
-            </button>
-            <div className="background-section-title">{t.savedBackgrounds}</div>
-            {backgroundLibrary.length === 0 ? (
-              <div className="background-empty">{t.noSavedBackgrounds}</div>
-            ) : (
-              <div className="background-grid">
-                {backgroundLibrary.map((item) => (
-                  <div className="background-card" key={item.id}>
-                    <img src={item.public_url} alt={item.name} />
-                    <div className="background-card-name" title={item.name}>{item.name}</div>
-                    <div className="background-card-actions">
-                      <button className="btn btn-primary btn-sm" onClick={() => useSavedBackground(item)}>{t.useBackground}</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteSavedBackground(item)}>{t.deleteFromLibrary}</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <div ref={boardRef} className={`board ${placeIt ? 'place-it-board' : ''}`} style={placeIt ? { backgroundColor: '#fff', backgroundImage: 'none' } : undefined}>
+        {notes.length === 0 && <div className={`board-empty ${placeIt ? 'place-it-empty' : ''}`}>{t.emptyBoard}</div>}
+        {notes.map((note) => {
+          let simClass = ''
+          if (similar) {
+            const group = similar.groupByNoteId.get(note.id)
+            simClass = group === undefined ? 'sim-dim' : `sim-group-${group % 6}`
+          }
+          return (
+            <StickyNote
+              key={note.id}
+              note={note}
+              onMove={(id, x, y) => {
+                if (!placeIt) return moveNote(room, id, x, y)
+                const board = boardRef.current
+                if (!board) return moveNote(room, id, x, y)
+                const rx = Math.min(1, Math.max(0, (x + 95) / board.clientWidth))
+                const ry = Math.min(1, Math.max(0, (y + 75) / board.clientHeight))
+                return moveNote(room, id, x, y, rx, ry)
+              }}
+              onDelete={(id) => deleteNote(room, id)}
+              simClass={simClass}
+              common={common}
+              normalized={placeIt}
+            />
+          )
+        })}
+        {similar && <div className="similarity-banner">{t.similarGroupsFound(similar.groupCount)}</div>}
+      </div>
 
       {clearOpen && (
         <div className="clear-modal-backdrop" onClick={() => setClearOpen(false)}>
@@ -782,6 +578,193 @@ function Facilitator() {
       )}
     </div>
   )
+}
+
+function normalizePersonKey(name = '') {
+  return normalizeArabic(name.toLowerCase()).replace(/\s+/g, ' ').trim()
+}
+
+function buildSuperstarLeaderboard(submissions) {
+  const counts = new Map()
+  const latest = new Map()
+  const displayNames = new Map()
+  submissions.forEach((item) => {
+    const pair = [
+      { key: item.participant_key || normalizePersonKey(item.participant_name), name: item.participant_name },
+      { key: item.peer_key || normalizePersonKey(item.peer_name), name: item.peer_name },
+    ]
+    pair.forEach((person) => {
+      counts.set(person.key, (counts.get(person.key) || 0) + 1)
+      latest.set(person.key, item)
+      displayNames.set(person.key, person.name)
+    })
+  })
+  const max = Math.max(0, ...counts.values())
+  const leaders = [...counts.entries()]
+    .filter(([, count]) => count === max)
+    .map(([key, count]) => ({
+      key,
+      count,
+      name: displayNames.get(key) || key,
+      submission: latest.get(key),
+    }))
+  return { counts, leaders, max }
+}
+
+function SuperstarFeedCard({ item, compact = false }) {
+  const { t } = useLang()
+  return (
+    <div className={`superstar-card ${compact ? 'superstar-card-compact' : ''}`}>
+      <img src={item.photo_url} alt={`${item.participant_name} and ${item.peer_name}`} className="superstar-card-photo" />
+      <div className="superstar-card-body">
+        <div className="superstar-card-names">{item.participant_name} + {item.peer_name}</div>
+        <div className="superstar-card-lesson-label">{t.lessonLearned}</div>
+        <div className="superstar-card-lesson">{item.lesson}</div>
+      </div>
+    </div>
+  )
+}
+
+function SuperstarFacilitator({ room }) {
+  const { t } = useLang()
+  const [submissions, setSubmissions] = useState([])
+  const [qrVisible, setQrVisible] = useState(true)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [clearOpen, setClearOpen] = useState(false)
+  const containerRef = useRef(null)
+  const boardRef = useRef(null)
+  const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
+  const leaderboard = useMemo(() => buildSuperstarLeaderboard(submissions), [submissions])
+
+  useEffect(() => subscribeToSuperstarSubmissions(room, setSubmissions), [room])
+  useEffect(() => {
+    const handler = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
+
+  async function toggleFullscreen() {
+    if (document.fullscreenElement) await document.exitFullscreen()
+    else await containerRef.current?.requestFullscreen?.()
+  }
+
+  async function takeScreenshot() {
+    const board = boardRef.current
+    if (!board) return
+    const canvas = await html2canvas(board, { backgroundColor: '#000000', useCORS: true, scale: Math.min(2, window.devicePixelRatio || 1.5) })
+    const link = document.createElement('a')
+    link.download = `superstar-${room}.png`
+    link.href = canvas.toDataURL('image/png')
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
+  async function handleClear() {
+    await clearRoom(room)
+    setSubmissions([])
+    setClearOpen(false)
+  }
+
+  return (
+    <div className="facilitator" ref={containerRef}>
+      <div className="toolbar">
+        <div className="toolbar-group toolbar-left">
+          <div className="room-badge"><span className="label">{t.roomCode}</span> {room}</div>
+          <button className="btn btn-ghost btn-sm" onClick={() => setQrVisible((v) => !v)}>{qrVisible ? t.hideQr : t.showQr}</button>
+        </div>
+        <div className="toolbar-group">
+          <button className="btn btn-ghost btn-sm" onClick={takeScreenshot}>{t.screenshot}</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setClearOpen(true)}>{t.clearScreen}</button>
+          <button className="btn btn-ghost btn-sm" onClick={toggleFullscreen}>{fullscreen ? t.exitFullscreen : t.fullscreen}</button>
+          <LanguageSwitch toolbar />
+        </div>
+      </div>
+
+      <div className="superstar-stage" ref={boardRef}>
+        <div className="superstar-feed-column">
+          {qrVisible && (
+            <div className="superstar-qr-card">
+              <div className="superstar-qr-title">{t.scanToJoin}</div>
+              <QRCodeSVG value={joinUrl} size={132} />
+              <div className="superstar-qr-code">{room}</div>
+            </div>
+          )}
+          <div className="superstar-feed-title">{t.liveFeed}</div>
+          <div className="superstar-feed-list">
+            {submissions.length === 0 && <div className="superstar-feed-empty">{t.superstarEmpty}</div>}
+            {submissions.map((item) => <SuperstarFeedCard key={item.id} item={item} compact />)}
+          </div>
+        </div>
+        <div className="superstar-main-panel" style={{ backgroundImage: `url(${superstarBanner})` }}>
+          <div className="superstar-main-label">{leaderboard.leaders.length > 1 ? t.tiedSuperstars : t.currentSuperstar}</div>
+          <div className="superstar-winners-slot">
+            {leaderboard.leaders.length === 0 ? (
+              <div className="superstar-winner-empty">{t.noSubmissionsYet}</div>
+            ) : (
+              <div className={`superstar-winners-grid superstar-winners-${Math.min(leaderboard.leaders.length, 4)}`}>
+                {leaderboard.leaders.map((leader) => (
+                  <div className="superstar-winner-card" key={leader.key}>
+                    <img src={leader.submission.photo_url} alt={leader.name} className="superstar-winner-photo" />
+                    <div className="superstar-winner-meta">
+                      <div className="superstar-winner-name">{leader.name}</div>
+                      <div className="superstar-winner-score">{leader.count}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {clearOpen && (
+        <div className="clear-modal-backdrop" onClick={() => setClearOpen(false)}>
+          <div className="clear-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{t.clearConfirmTitle}</h3>
+            <p>{t.clearConfirmBody}</p>
+            <div className="clear-modal-actions">
+              <button className="btn btn-ghost-light" onClick={() => setClearOpen(false)}>{t.cancel}</button>
+              <button className="btn btn-danger" onClick={handleClear}>{t.clearAll}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Facilitator() {
+  const { code = '' } = useParams()
+  const room = code.toUpperCase()
+  const { t } = useLang()
+  const [exists, setExists] = useState(null)
+  const [roomConfig, setRoomConfig] = useState(null)
+  const [connectionError, setConnectionError] = useState('')
+
+  useEffect(() => {
+    getRoom(room)
+      .then((data) => { setRoomConfig(data); setExists(Boolean(data)) })
+      .catch((e) => { setConnectionError(e.message); setExists(false) })
+  }, [room])
+
+  useEffect(() => {
+    if (!exists) return
+    return subscribeToRoom(room, (data) => data && setRoomConfig(data))
+  }, [room, exists])
+
+  if (exists === null) return <div className="home"><div className="home-card"><p>Loading…</p></div></div>
+  if (!exists) return (
+    <div className="home">
+      <div className="home-card">
+        <h2>{connectionError ? 'Connection error' : t.roomNotFound}</h2>
+        {connectionError && <p className="error-text">{connectionError}</p>}
+      </div>
+    </div>
+  )
+
+  if (roomConfig?.mode === 'superstar') return <SuperstarFacilitator room={room} />
+  return <BaseFacilitator room={room} roomConfig={roomConfig} />
 }
 
 const COLORS = [
@@ -813,20 +796,128 @@ function ColorPicker({ value, onChange }) {
   )
 }
 
-const MAX_CHARS = 150
-const participantKey = (room) => 'lsn_participant_' + room
+function SuperstarParticipant({ room, participant, roomConfig }) {
+  const { t } = useLang()
+  const [submissions, setSubmissions] = useState([])
+  const [peerName, setPeerName] = useState('')
+  const [lesson, setLesson] = useState('')
+  const [file, setFile] = useState(null)
+  const [preview, setPreview] = useState('')
+  const [online, setOnline] = useState(navigator.onLine)
+  const [posting, setPosting] = useState(false)
+  const [postError, setPostError] = useState('')
 
-function Participant() {
-  const { code = '' } = useParams()
-  const room = code.toUpperCase()
+  useEffect(() => subscribeToSuperstarSubmissions(room, setSubmissions), [room])
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+      if (preview) URL.revokeObjectURL(preview)
+    }
+  }, [preview])
+
+  const myEntries = useMemo(() => submissions.filter((item) => item.participant_id === participant.id), [submissions, participant])
+  const sortedMyEntries = useMemo(() => myEntries.slice().reverse(), [myEntries])
+
+  function handleFile(e) {
+    const next = e.target.files?.[0] || null
+    setFile(next)
+    setPostError('')
+    if (preview) URL.revokeObjectURL(preview)
+    setPreview(next ? URL.createObjectURL(next) : '')
+  }
+
+  async function post(e) {
+    e.preventDefault()
+    const peer = peerName.trim()
+    const text = lesson.trim()
+    if (!peer || !text || posting) return
+    if (!file) {
+      setPostError(t.selfieRequired)
+      return
+    }
+    if (normalizePersonKey(peer) === normalizePersonKey(participant.name)) {
+      setPostError(t.sameNameError)
+      return
+    }
+    const pairKey = [normalizePersonKey(participant.name), normalizePersonKey(peer)].sort().join('|')
+    const duplicate = submissions.some((item) => [item.participant_key, item.peer_key].sort().join('|') === pairKey)
+    if (duplicate) {
+      setPostError(t.duplicatePairError)
+      return
+    }
+    setPosting(true)
+    setPostError('')
+    try {
+      await addSuperstarSubmission(room, {
+        participantId: participant.id,
+        participantName: participant.name,
+        peerName: peer,
+        lesson: text,
+        file,
+      })
+      setPeerName('')
+      setLesson('')
+      setFile(null)
+      if (preview) URL.revokeObjectURL(preview)
+      setPreview('')
+    } catch (error) {
+      setPostError(error.message || 'Failed to submit.')
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  return (
+    <div className="participant">
+      <LanguageSwitch />
+      <div className="participant-header">
+        <div className="room-tag">
+          {t.roomCode}: <strong>{room}</strong>
+          <div>{t.postedAs} <strong>{participant.name}</strong></div>
+          <div>{t.pairCount}: <strong>{myEntries.length}</strong></div>
+        </div>
+        <span className={`status-dot ${online ? '' : 'offline'}`}>{online ? t.connected : t.reconnecting}</span>
+      </div>
+      <div className="participant-body">
+        <form className="composer" onSubmit={post}>
+          <h2>{roomConfig?.mode === 'superstar' ? t.superstarMode : t.writeNote}</h2>
+          <div className="field">
+            <label>{t.peerName}</label>
+            <input value={peerName} onChange={(e) => setPeerName(e.target.value)} placeholder={t.peerPlaceholder} maxLength={40} />
+          </div>
+          <div className="field">
+            <label>{t.lessonLabel}</label>
+            <textarea value={lesson} onChange={(e) => setLesson(e.target.value)} placeholder={t.lessonPlaceholder} rows={4} maxLength={MAX_LESSON} />
+          </div>
+          <div className="composer-meta">
+            <span>{MAX_LESSON - lesson.length} {t.charactersLeft}</span><span>{lesson.length}/{MAX_LESSON}</span>
+          </div>
+          <div className="field">
+            <label>{t.choosePhoto}</label>
+            <input type="file" accept="image/*" capture="environment" onChange={handleFile} />
+          </div>
+          {preview && <img src={preview} alt="preview" className="superstar-preview" />}
+          {postError && <div className="post-error">⚠ {postError}</div>}
+          <button className="btn btn-primary post-btn" disabled={posting || !peerName.trim() || !lesson.trim() || !file}>{posting ? '…' : t.submitSelfie}</button>
+        </form>
+
+        <div className="my-notes">
+          <h2>{t.myNotes}</h2>
+          {sortedMyEntries.length === 0 && <div className="my-notes-empty">{t.noSubmissionsYet}</div>}
+          {sortedMyEntries.map((item) => <SuperstarFeedCard key={item.id} item={item} />)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StickyParticipant({ room, participant, roomConfig }) {
   const { t, lang } = useLang()
-  const [exists, setExists] = useState(null)
-  const [roomConfig, setRoomConfig] = useState(null)
-  const [connectionError, setConnectionError] = useState('')
-  const [participant, setParticipant] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem(participantKey(room))) } catch { return null }
-  })
-  const [name, setName] = useState('')
   const [notes, setNotes] = useState([])
   const [online, setOnline] = useState(navigator.onLine)
   const [text, setText] = useState('')
@@ -837,21 +928,7 @@ function Participant() {
   const [editText, setEditText] = useState('')
   const [placement, setPlacement] = useState(null)
 
-  useEffect(() => {
-    getRoom(room)
-      .then((data) => { setRoomConfig(data); setExists(Boolean(data)) })
-      .catch((e) => { setConnectionError(e.message); setExists(false) })
-  }, [room])
-
-  useEffect(() => {
-    if (!exists) return
-    return subscribeToRoom(room, (data) => data && setRoomConfig(data))
-  }, [room, exists])
-
-  useEffect(() => {
-    if (participant && exists) return subscribeToNotes(room, setNotes)
-  }, [room, participant, exists])
-
+  useEffect(() => subscribeToNotes(room, setNotes), [room])
   useEffect(() => {
     const on = () => setOnline(true)
     const off = () => setOnline(false)
@@ -863,7 +940,7 @@ function Participant() {
     }
   }, [])
 
-  const myNotes = useMemo(() => notes.filter((n) => n.participant_id === participant?.id), [notes, participant])
+  const myNotes = useMemo(() => notes.filter((n) => n.participant_id === participant.id), [notes, participant])
   const placeItMode = roomConfig?.mode === 'place_it'
 
   function choosePlacement(e) {
@@ -871,15 +948,6 @@ function Participant() {
     const rx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
     const ry = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height))
     setPlacement({ rx, ry })
-  }
-
-  function saveName(e) {
-    e.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) return
-    const p = { id: crypto.randomUUID(), name: trimmed }
-    sessionStorage.setItem(participantKey(room), JSON.stringify(p))
-    setParticipant(p)
   }
 
   async function post(e) {
@@ -915,6 +983,107 @@ function Participant() {
     setEditingId(null)
   }
 
+  const remaining = MAX_CHARS - text.length
+  const over = remaining < 0
+
+  return (
+    <div className="participant">
+      <LanguageSwitch />
+      <div className="participant-header">
+        <div className="room-tag">
+          {t.roomCode}: <strong>{room}</strong>
+          <div>{t.postedAs} <strong>{participant.name}</strong></div>
+        </div>
+        <span className={`status-dot ${online ? '' : 'offline'}`}>{online ? t.connected : t.reconnecting}</span>
+      </div>
+      <div className="participant-body">
+        <form className="composer" onSubmit={post}>
+          <h2>{t.writeNote}</h2>
+          <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={t.notePlaceholder} rows={4} />
+          <div className={`composer-meta ${over ? 'limit' : ''}`}>
+            <span>{remaining} {t.charactersLeft}</span><span>{text.length}/{MAX_CHARS}</span>
+          </div>
+          <ColorPicker value={color} onChange={setColor} />
+          {placeItMode && (
+            <div className="placement-section">
+              <div className="placement-title">{t.choosePosition}</div>
+              <div className="placement-picker" onClick={choosePlacement}>
+                {!placement && <span className="placement-hint">{t.positionHint}</span>}
+                {placement && <span className="placement-marker" style={{ left: `${placement.rx * 100}%`, top: `${placement.ry * 100}%` }} />}
+              </div>
+              <div className="placement-status">{placement ? t.positionSelected : t.positionHint}</div>
+            </div>
+          )}
+          {postError && <div className="post-error">⚠ {postError}</div>}
+          <button className="btn btn-primary post-btn" disabled={!text.trim() || over || posting || (placeItMode && !placement)}>{posting ? '…' : t.postNote}</button>
+        </form>
+
+        <div className="my-notes">
+          <h2>{t.myNotes}</h2>
+          {myNotes.length === 0 && <div className="my-notes-empty">{t.noNotesYet}</div>}
+          {myNotes.map((note) => {
+            const editing = editingId === note.id
+            return (
+              <div className="my-note-row" data-color={note.color} key={note.id}>
+                {editing ? (
+                  <div className="my-note-edit">
+                    <textarea value={editText} maxLength={MAX_CHARS} onChange={(e) => setEditText(e.target.value)} rows={3} autoFocus />
+                    <div className="composer-meta"><span>{MAX_CHARS - editText.length} {t.charactersLeft}</span></div>
+                    <div className="row-actions">
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => saveEdit(note.id)}>{t.save}</button>
+                      <button type="button" className="btn btn-text btn-sm" onClick={() => setEditingId(null)}>{t.cancel}</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="my-note-text">{note.text}</div>
+                    <div className="my-note-actions">
+                      <button type="button" className="btn btn-ghost-light btn-sm" onClick={() => { setEditingId(note.id); setEditText(note.text) }}>{t.edit}</button>
+                      <button type="button" className="btn btn-danger btn-sm" onClick={() => deleteParticipantNote(room, note.id, participant.id)}>{t.delete}</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Participant() {
+  const { code = '' } = useParams()
+  const room = code.toUpperCase()
+  const { t } = useLang()
+  const [exists, setExists] = useState(null)
+  const [roomConfig, setRoomConfig] = useState(null)
+  const [connectionError, setConnectionError] = useState('')
+  const [participant, setParticipant] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(participantKey(room))) } catch { return null }
+  })
+  const [name, setName] = useState('')
+
+  useEffect(() => {
+    getRoom(room)
+      .then((data) => { setRoomConfig(data); setExists(Boolean(data)) })
+      .catch((e) => { setConnectionError(e.message); setExists(false) })
+  }, [room])
+
+  useEffect(() => {
+    if (!exists) return
+    return subscribeToRoom(room, (data) => data && setRoomConfig(data))
+  }, [room, exists])
+
+  function saveName(e) {
+    e.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const p = { id: crypto.randomUUID(), name: trimmed }
+    sessionStorage.setItem(participantKey(room), JSON.stringify(p))
+    setParticipant(p)
+  }
+
   if (exists === null) return <div className="home"><div className="home-card"><p>Connecting…</p></div></div>
   if (!exists) return (
     <div className="home">
@@ -941,82 +1110,8 @@ function Participant() {
     </div>
   )
 
-  const remaining = MAX_CHARS - text.length
-  const over = remaining < 0
-
-  return (
-    <div className="participant">
-      <LanguageSwitch />
-      <div className="participant-header">
-        <div className="room-tag">
-          {t.roomCode}: <strong>{room}</strong>
-          <div>{t.postedAs} <strong>{participant.name}</strong></div>
-        </div>
-        <span className={`status-dot ${online ? '' : 'offline'}`}>{online ? t.connected : t.reconnecting}</span>
-      </div>
-      <div className="participant-body">
-        <form className="composer" onSubmit={post}>
-          <h2>{t.writeNote}</h2>
-          <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={t.notePlaceholder} rows={4} />
-          <div className={`composer-meta ${over ? 'limit' : ''}`}>
-            <span>{remaining} {t.charactersLeft}</span><span>{text.length}/{MAX_CHARS}</span>
-          </div>
-          <ColorPicker value={color} onChange={setColor} />
-          {placeItMode && (
-            <div className="placement-section">
-              <div className="placement-title">{t.choosePosition}</div>
-              <div
-                className="placement-picker"
-                onClick={choosePlacement}
-                style={roomConfig?.background_data ? {
-                  backgroundImage: `url(${roomConfig.background_data})`,
-                  backgroundSize: 'contain',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                } : undefined}
-              >
-                {!roomConfig?.background_data && <span className="placement-hint">{t.positionHint}</span>}
-                {placement && <span className="placement-marker" style={{ left: `${placement.rx * 100}%`, top: `${placement.ry * 100}%` }} />}
-              </div>
-              <div className="placement-status">{placement ? t.positionSelected : t.positionHint}</div>
-            </div>
-          )}
-          {postError && <div className="post-error">⚠ {postError}</div>}
-          <button className="btn btn-primary post-btn" disabled={!text.trim() || over || posting || (placeItMode && !placement)}>{posting ? '…' : t.postNote}</button>
-        </form>
-
-        <div className="my-notes">
-          <h2>{t.myNotes}</h2>
-          {myNotes.length === 0 && <div className="my-notes-empty">{t.noNotesYet}</div>}
-          {myNotes.map((note) => {
-            const editing = editingId === note.id
-            return (
-              <div className="my-note-row" data-color={note.color} key={note.id}>
-                {editing ? (
-                  <div className="my-note-edit">
-                    <textarea value={editText} maxLength={MAX_CHARS} onChange={(e) => setEditText(e.target.value)} rows={3} autoFocus />
-                    <div className="composer-meta"><span>{MAX_CHARS - editText.length} {t.charactersLeft}</span></div>
-                    <div className="row-actions">
-                      <button className="btn btn-primary btn-sm" onClick={() => saveEdit(note.id)}>{t.save}</button>
-                      <button className="btn btn-text btn-sm" onClick={() => setEditingId(null)}>{t.cancel}</button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="my-note-text">{note.text}</div>
-                    <div className="my-note-actions">
-                      <button className="btn btn-ghost-light btn-sm" onClick={() => { setEditingId(note.id); setEditText(note.text) }}>{t.edit}</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteParticipantNote(room, note.id, participant.id)}>{t.delete}</button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
+  if (roomConfig?.mode === 'superstar') return <SuperstarParticipant room={room} participant={participant} roomConfig={roomConfig} />
+  return <StickyParticipant room={room} participant={participant} roomConfig={roomConfig} />
 }
 
 export default function App() {
