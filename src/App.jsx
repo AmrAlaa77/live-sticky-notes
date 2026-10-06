@@ -92,6 +92,8 @@ const I18N = {
     uploadingBackground: 'Uploading…',
     backgroundSaved: 'Background saved',
     backgroundUploadError: 'Could not save the background.',
+    uploadSaveBackground: 'Upload & save background',
+    backgroundHelp: 'Choose JPG, PNG, WEBP or HEIC. The image is saved for this room.',
   },
   ar: {
     appName: 'الملاحظات اللاصقة الحية',
@@ -163,6 +165,8 @@ const I18N = {
     uploadingBackground: 'جاري الرفع…',
     backgroundSaved: 'تم حفظ الخلفية',
     backgroundUploadError: 'تعذر حفظ الخلفية.',
+    uploadSaveBackground: 'رفع وحفظ الخلفية',
+    backgroundHelp: 'اختر صورة JPG أو PNG أو WEBP أو HEIC. سيتم حفظها لهذه الغرفة.',
   },
 }
 
@@ -490,17 +494,27 @@ function BaseFacilitator({ room, roomConfig }) {
   async function handleBackgroundUpload(event) {
     const file = event.target.files?.[0]
     if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      setBackgroundMessage('Image must be 10 MB or smaller.')
+      event.target.value = ''
+      return
+    }
     setBackgroundUploading(true)
     setBackgroundMessage('')
+    const localPreview = URL.createObjectURL(file)
+    setBackgroundPreview(localPreview)
     try {
       const uploaded = await uploadBackground(file)
       await updateRoom(room, { background_data: uploaded.public_url })
+      setBackgroundPreview(uploaded.public_url)
       setBackgroundMessage(t.backgroundSaved)
-      window.setTimeout(() => setBackgroundMessage(''), 2200)
+      window.setTimeout(() => setBackgroundMessage(''), 3000)
     } catch (error) {
       console.error(error)
-      setBackgroundMessage(t.backgroundUploadError)
+      setBackgroundPreview('')
+      setBackgroundMessage((error?.message ? error.message + ' — ' : '') + t.backgroundUploadError)
     } finally {
+      URL.revokeObjectURL(localPreview)
       setBackgroundUploading(false)
       event.target.value = ''
     }
@@ -693,13 +707,14 @@ function SuperstarFacilitator({ room, roomConfig }) {
   const [clearOpen, setClearOpen] = useState(false)
   const [backgroundUploading, setBackgroundUploading] = useState(false)
   const [backgroundMessage, setBackgroundMessage] = useState('')
+  const [backgroundPreview, setBackgroundPreview] = useState('')
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const leaderboard = useMemo(() => buildSuperstarLeaderboard(submissions), [submissions])
   const savedBackground = typeof roomConfig?.background_data === 'string' && roomConfig.background_data.trim() ? roomConfig.background_data.trim() : ''
-  const superstarBackground = savedBackground || superstarBanner
+  const superstarBackground = backgroundPreview || savedBackground || superstarBanner
 
   useEffect(() => subscribeToSuperstarSubmissions(room, setSubmissions), [room])
   useEffect(() => {
@@ -739,21 +754,6 @@ function SuperstarFacilitator({ room, roomConfig }) {
           <button className="btn btn-ghost btn-sm" onClick={() => setQrVisible((v) => !v)}>{qrVisible ? t.hideQr : t.showQr}</button>
         </div>
         <div className="toolbar-group">
-          <input
-            ref={backgroundInputRef}
-            type="file"
-            accept="image/*"
-            className="superstar-background-input"
-            onChange={handleBackgroundUpload}
-          />
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => backgroundInputRef.current?.click()}
-            disabled={backgroundUploading}
-          >
-            {backgroundUploading ? t.uploadingBackground : t.uploadBackground}
-          </button>
-          {backgroundMessage && <span className="superstar-background-status">{backgroundMessage}</span>}
           <button className="btn btn-ghost btn-sm" onClick={takeScreenshot}>{t.screenshot}</button>
           <button className="btn btn-ghost btn-sm" onClick={() => setClearOpen(true)}>{t.clearScreen}</button>
           <button className="btn btn-ghost btn-sm" onClick={toggleFullscreen}>{fullscreen ? t.exitFullscreen : t.fullscreen}</button>
@@ -770,6 +770,25 @@ function SuperstarFacilitator({ room, roomConfig }) {
               <div className="superstar-qr-code">{room}</div>
             </div>
           )}
+          <div className="superstar-background-upload-card">
+            <input
+              ref={backgroundInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              className="superstar-background-input"
+              onChange={handleBackgroundUpload}
+            />
+            <button
+              type="button"
+              className="superstar-background-upload-button"
+              onClick={() => backgroundInputRef.current?.click()}
+              disabled={backgroundUploading}
+            >
+              {backgroundUploading ? t.uploadingBackground : t.uploadSaveBackground}
+            </button>
+            <div className="superstar-background-help">{t.backgroundHelp}</div>
+            {backgroundMessage && <div className="superstar-background-status">{backgroundMessage}</div>}
+          </div>
           <div className="superstar-feed-title">{t.liveFeed}</div>
           <div className="superstar-feed-list">
             {submissions.length === 0 && <div className="superstar-feed-empty">{t.superstarEmpty}</div>}
