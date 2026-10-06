@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7b3f00"/>
+      <stop offset=".28" stop-color="#d78b12"/>
+      <stop offset=".52" stop-color="#ffd35b"/>
+      <stop offset=".72" stop-color="#bb6a00"/>
+      <stop offset="1" stop-color="#6c3200"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="78%" cy="54%" r="48%">
+      <stop offset="0" stop-color="#fff7b8" stop-opacity=".95"/>
+      <stop offset=".22" stop-color="#ffd455" stop-opacity=".74"/>
+      <stop offset=".55" stop-color="#d98508" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#7a3700" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ray" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9d4f00"/>
+      <stop offset=".55" stop-color="#ffd95c"/>
+      <stop offset=".82" stop-color="#fff8bf"/>
+      <stop offset="1" stop-color="#b65c00"/>
+    </linearGradient>
+    <filter id="shine" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#glow)"/>
+  <g transform="translate(1450 585)" opacity=".98">
+    <path d="M 250 -28 L 720 -49 L 720 49 L 250 28 Z" fill="url(#ray)" transform="rotate(0)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(11.25)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(22.5)"/><path d="M 235 -18 L 720 -31.5 L 720 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(33.75)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(45)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(56.25)"/><path d="M 250 -28 L 720 -49 L 720 49 L 250 28 Z" fill="url(#ray)" transform="rotate(67.5)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(78.75)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(90)"/><path d="M 235 -18 L 720 -31.5 L 720 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(101.25)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(112.5)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(123.75)"/><path d="M 250 -28 L 720 -49 L 720 49 L 250 28 Z" fill="url(#ray)" transform="rotate(135)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(146.25)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(157.5)"/><path d="M 235 -18 L 720 -31.5 L 720 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(168.75)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(180)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(191.25)"/><path d="M 250 -28 L 720 -49 L 720 49 L 250 28 Z" fill="url(#ray)" transform="rotate(202.5)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(213.75)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(225)"/><path d="M 235 -18 L 720 -31.5 L 720 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(236.25)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(247.5)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(258.75)"/><path d="M 250 -28 L 720 -49 L 720 49 L 250 28 Z" fill="url(#ray)" transform="rotate(270)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(281.25)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(292.5)"/><path d="M 235 -18 L 720 -31.5 L 720 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(303.75)"/><path d="M 250 -28 L 650 -49 L 650 49 L 250 28 Z" fill="url(#ray)" transform="rotate(315)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(326.25)"/><path d="M 250 -28 L 720 -49 L 720 49 L 250 28 Z" fill="url(#ray)" transform="rotate(337.5)"/><path d="M 235 -18 L 650 -31.5 L 650 31.5 L 235 18 Z" fill="url(#ray)" transform="rotate(348.75)"/>
+    <circle r="330" fill="#b66400" opacity=".16"/>
+    <polygon points="0,-245 58,-76 238,-76 94,28 148,198 0,96 -148,198 -94,28 -238,-76 -58,-76"
+      fill="#9f5708" stroke="#fff1a8" stroke-width="10" filter="url(#shine)"/>
+    <polygon points="0,-225 53,-70 219,-70 86,26 136,183 0,88 -136,183 -86,26 -219,-70 -53,-70"
+      fill="#9e5709" stroke="#ffd55b" stroke-width="4"/>
+  </g>
+  <rect x="0" y="0" width="720" height="1080" fill="url(#bg)" opacity=".60"/>
+</svg>
