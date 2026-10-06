@@ -621,10 +621,10 @@ function buildSuperstarLeaderboard(submissions) {
   return { counts, leaders, max }
 }
 
-function SuperstarFeedCard({ item, compact = false }) {
+function SuperstarFeedCard({ item, compact = false, highlight = false }) {
   const { t } = useLang()
   return (
-    <div className={`superstar-card ${compact ? 'superstar-card-compact' : ''}`}>
+    <div className={`superstar-card ${compact ? 'superstar-card-compact' : ''} ${highlight ? 'is-new' : ''}`}>
       <img src={item.photo_url} alt={`${item.participant_name} and ${item.peer_name}`} className="superstar-card-photo" />
       <div className="superstar-card-body">
         <div className="superstar-card-names">{item.participant_name} + {item.peer_name}</div>
@@ -676,14 +676,49 @@ function SuperstarFacilitator({ room, roomConfig }) {
   const [backgroundMessage, setBackgroundMessage] = useState('')
   const [backgroundUrl, setBackgroundUrl] = useState(roomConfig?.background_data || '')
   const [winnerOffset, setWinnerOffset] = useState({ x: 0, y: 0 })
+  const [feedRotation, setFeedRotation] = useState(0)
+  const [highlightedSubmissionId, setHighlightedSubmissionId] = useState(null)
   const winnerDragRef = useRef(null)
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const leaderboard = useMemo(() => buildSuperstarLeaderboard(submissions), [submissions])
+  const latestFirst = useMemo(() => [...submissions].reverse(), [submissions])
+  const feedPageSize = 6
+  const visibleFeed = useMemo(() => {
+    if (latestFirst.length <= feedPageSize) return latestFirst
+    const start = feedRotation % latestFirst.length
+    return Array.from({ length: feedPageSize }, (_, index) => latestFirst[(start + index) % latestFirst.length])
+  }, [latestFirst, feedRotation])
+  const firstFeedColumn = visibleFeed.slice(0, 2)
+  const secondFeedColumn = visibleFeed.slice(2, 6)
 
   useEffect(() => subscribeToSuperstarSubmissions(room, setSubmissions), [room])
+  useEffect(() => {
+    setFeedRotation(0)
+    if (!submissions.length) {
+      setHighlightedSubmissionId(null)
+      return undefined
+    }
+
+    const newestId = submissions[submissions.length - 1]?.id
+    setHighlightedSubmissionId(newestId)
+    const highlightTimer = window.setTimeout(() => setHighlightedSubmissionId(null), 6000)
+
+    if (submissions.length <= feedPageSize) {
+      return () => window.clearTimeout(highlightTimer)
+    }
+
+    const rotationTimer = window.setInterval(() => {
+      setFeedRotation((current) => (current + feedPageSize) % submissions.length)
+    }, 7000)
+
+    return () => {
+      window.clearTimeout(highlightTimer)
+      window.clearInterval(rotationTimer)
+    }
+  }, [submissions.length, submissions[submissions.length - 1]?.id])
   useEffect(() => {
     setBackgroundUrl(roomConfig?.background_data || '')
   }, [roomConfig?.background_data])
@@ -787,36 +822,60 @@ function SuperstarFacilitator({ room, roomConfig }) {
       </div>
 
       <div className="superstar-stage" ref={boardRef}>
-        <div className="superstar-feed-column">
-          {qrVisible && (
-            <div className="superstar-qr-card">
-              <div className="superstar-qr-title">{t.scanToJoin}</div>
-              <QRCodeSVG value={joinUrl} size={116} fgColor="#5b3900" bgColor="#fff7e2" level="H" includeMargin />
-              <div className="superstar-qr-code">{room}</div>
+        <div className="superstar-feeds-area">
+          <div className="superstar-feed-column superstar-feed-column-primary">
+            {qrVisible && (
+              <div className="superstar-qr-card">
+                <div className="superstar-qr-title">{t.scanToJoin}</div>
+                <QRCodeSVG value={joinUrl} size={116} fgColor="#5b3900" bgColor="#fff7e2" level="H" includeMargin />
+                <div className="superstar-qr-code">{room}</div>
+              </div>
+            )}
+            <div className="superstar-background-uploader">
+              <input
+                ref={backgroundInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                onChange={handleBackgroundUpload}
+                className="superstar-background-file"
+              />
+              <button
+                type="button"
+                className="superstar-background-button"
+                onClick={() => backgroundInputRef.current?.click()}
+                disabled={backgroundUploading}
+              >
+                {backgroundUploading ? t.uploadingBackground : t.uploadSaveBackground}
+              </button>
+              {backgroundMessage && <div className="superstar-background-message">{backgroundMessage}</div>}
             </div>
-          )}
-          <div className="superstar-background-uploader">
-            <input
-              ref={backgroundInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-              onChange={handleBackgroundUpload}
-              className="superstar-background-file"
-            />
-            <button
-              type="button"
-              className="superstar-background-button"
-              onClick={() => backgroundInputRef.current?.click()}
-              disabled={backgroundUploading}
-            >
-              {backgroundUploading ? t.uploadingBackground : t.uploadSaveBackground}
-            </button>
-            {backgroundMessage && <div className="superstar-background-message">{backgroundMessage}</div>}
+            <div className="superstar-feed-title">{t.liveFeed}</div>
+            <div className="superstar-feed-list superstar-feed-list-primary">
+              {submissions.length === 0 && <div className="superstar-feed-empty">{t.superstarEmpty}</div>}
+              {firstFeedColumn.map((item) => (
+                <SuperstarFeedCard
+                  key={item.id}
+                  item={item}
+                  compact
+                  highlight={item.id === highlightedSubmissionId}
+                />
+              ))}
+            </div>
           </div>
-          <div className="superstar-feed-title">{t.liveFeed}</div>
-          <div className="superstar-feed-list">
-            {submissions.length === 0 && <div className="superstar-feed-empty">{t.superstarEmpty}</div>}
-            {submissions.map((item) => <SuperstarFeedCard key={item.id} item={item} compact />)}
+
+          <div className="superstar-feed-column superstar-feed-column-secondary">
+            <div className="superstar-feed-title">{t.liveFeed}</div>
+            <div className="superstar-feed-list superstar-feed-list-secondary">
+              {submissions.length === 0 && <div className="superstar-feed-empty superstar-feed-empty-secondary">{t.superstarEmpty}</div>}
+              {secondFeedColumn.map((item) => (
+                <SuperstarFeedCard
+                  key={item.id}
+                  item={item}
+                  compact
+                  highlight={item.id === highlightedSubmissionId}
+                />
+              ))}
+            </div>
           </div>
         </div>
         <div className="superstar-main-panel" style={{ backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : 'none' }}>
