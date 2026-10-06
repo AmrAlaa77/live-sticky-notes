@@ -1,5 +1,16 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    {
+      "source": "/gyro",
+      "destination": "/gyro/index.html"
+    },
+    {
+      "source": "/gyro/:path*",
+      "destination": "/gyro/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
   ]
 }
