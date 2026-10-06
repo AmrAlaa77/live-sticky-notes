@@ -487,31 +487,6 @@ function BaseFacilitator({ room, roomConfig }) {
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const common = useMemo(() => commonWords(notes), [notes])
 
-  async function handleBackgroundUpload(event) {
-    const file = event.target.files?.[0]
-    if (!file) return
-    if (file.size > 10 * 1024 * 1024) {
-      setBackgroundMessage('Image must be 10 MB or smaller.')
-      event.target.value = ''
-      return
-    }
-
-    setBackgroundUploading(true)
-    setBackgroundMessage('')
-    try {
-      const uploaded = await uploadBackground(file)
-      await updateRoom(room, { background_data: uploaded.public_url })
-      setBackgroundUrl(uploaded.public_url)
-      setBackgroundMessage(t.backgroundSaved)
-    } catch (error) {
-      console.error('Superstar background upload:', error)
-      setBackgroundMessage(t.backgroundUploadError)
-    } finally {
-      setBackgroundUploading(false)
-      event.target.value = ''
-    }
-  }
-
   async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen()
     else await containerRef.current?.requestFullscreen?.()
@@ -715,6 +690,31 @@ function SuperstarFacilitator({ room, roomConfig }) {
     document.addEventListener('fullscreenchange', handler)
     return () => document.removeEventListener('fullscreenchange', handler)
   }, [])
+
+  async function handleBackgroundUpload(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      setBackgroundMessage('Image must be 10 MB or smaller.')
+      event.target.value = ''
+      return
+    }
+
+    setBackgroundUploading(true)
+    setBackgroundMessage('')
+    try {
+      const uploaded = await uploadBackground(file)
+      await updateRoom(room, { background_data: uploaded.public_url })
+      setBackgroundUrl(uploaded.public_url)
+      setBackgroundMessage(t.backgroundSaved)
+    } catch (error) {
+      console.error('Superstar background upload:', error)
+      setBackgroundMessage(t.backgroundUploadError)
+    } finally {
+      setBackgroundUploading(false)
+      event.target.value = ''
+    }
+  }
 
   async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen()
