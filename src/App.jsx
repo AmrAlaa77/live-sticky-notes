@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import html2canvas from 'html2canvas'
 import superstarBanner from './assets/superstar-banner.svg'
+import superstarDefaultBg from './assets/superstar-default.png'
 import {
   addNote,
   addSuperstarSubmission,
@@ -674,7 +675,7 @@ function SuperstarFacilitator({ room, roomConfig }) {
   const [clearOpen, setClearOpen] = useState(false)
   const [backgroundUploading, setBackgroundUploading] = useState(false)
   const [backgroundMessage, setBackgroundMessage] = useState('')
-  const [backgroundUrl, setBackgroundUrl] = useState(roomConfig?.background_data || '')
+  const [backgroundUrl, setBackgroundUrl] = useState(roomConfig?.background_data || superstarDefaultBg)
   const [winnerOffset, setWinnerOffset] = useState({ x: 0, y: 0 })
   const [feedRotation, setFeedRotation] = useState(0)
   const [highlightedSubmissionId, setHighlightedSubmissionId] = useState(null)
@@ -720,7 +721,7 @@ function SuperstarFacilitator({ room, roomConfig }) {
     }
   }, [submissions.length, submissions[submissions.length - 1]?.id])
   useEffect(() => {
-    setBackgroundUrl(roomConfig?.background_data || '')
+    setBackgroundUrl(roomConfig?.background_data || superstarDefaultBg)
   }, [roomConfig?.background_data])
   useEffect(() => {
     const handler = () => setFullscreen(Boolean(document.fullscreenElement))
@@ -1305,3 +1306,4 @@ export default function App() {
     </LangProvider>
   )
 }
+
