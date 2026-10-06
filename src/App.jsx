@@ -675,6 +675,8 @@ function SuperstarFacilitator({ room, roomConfig }) {
   const [backgroundUploading, setBackgroundUploading] = useState(false)
   const [backgroundMessage, setBackgroundMessage] = useState('')
   const [backgroundUrl, setBackgroundUrl] = useState(roomConfig?.background_data || '')
+  const [winnerOffset, setWinnerOffset] = useState({ x: 0, y: 0 })
+  const winnerDragRef = useRef(null)
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
@@ -715,6 +717,35 @@ function SuperstarFacilitator({ room, roomConfig }) {
       setBackgroundUploading(false)
       event.target.value = ''
     }
+  }
+
+  function handleWinnerPointerDown(event) {
+    if (leaderboard.leaders.length === 0) return
+    event.preventDefault()
+    winnerDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: winnerOffset.x,
+      originY: winnerOffset.y,
+    }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  function handleWinnerPointerMove(event) {
+    const drag = winnerDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    setWinnerOffset({
+      x: drag.originX + (event.clientX - drag.startX),
+      y: drag.originY + (event.clientY - drag.startY),
+    })
+  }
+
+  function handleWinnerPointerUp(event) {
+    const drag = winnerDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    winnerDragRef.current = null
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
   }
 
   async function toggleFullscreen() {
@@ -789,8 +820,15 @@ function SuperstarFacilitator({ room, roomConfig }) {
           </div>
         </div>
         <div className="superstar-main-panel" style={{ backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : 'none' }}>
-          <div className={`superstar-main-label ${leaderboard.leaders.length === 0 ? 'is-empty' : ''}`}>{leaderboard.leaders.length > 1 ? t.tiedSuperstars : t.currentSuperstar}</div>
-          <div className={`superstar-winners-slot ${leaderboard.leaders.length === 0 ? 'is-empty' : ''}`}>
+          <div
+            className={`superstar-winners-slot ${leaderboard.leaders.length === 0 ? 'is-empty' : 'is-draggable'}`}
+            style={{ marginLeft: winnerOffset.x, marginTop: winnerOffset.y }}
+            onPointerDown={handleWinnerPointerDown}
+            onPointerMove={handleWinnerPointerMove}
+            onPointerUp={handleWinnerPointerUp}
+            onPointerCancel={handleWinnerPointerUp}
+            title={leaderboard.leaders.length > 0 ? 'Drag to move' : undefined}
+          >
             {leaderboard.leaders.length === 0 ? (
               <div className="superstar-winner-empty">{t.noSubmissionsYet}</div>
             ) : (
