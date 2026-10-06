@@ -17,6 +17,8 @@ import {
   subscribeToRoom,
   subscribeToSuperstarSubmissions,
   updateParticipantNote,
+  updateRoom,
+  uploadBackground,
 } from './supabase'
 
 const I18N = {
@@ -86,6 +88,10 @@ const I18N = {
     lessonLearned: 'Lesson',
     pairCount: 'Entries by you',
     noSubmissionsYet: 'No selfie submissions yet.',
+    uploadBackground: 'Upload background',
+    uploadingBackground: 'Uploading…',
+    backgroundSaved: 'Background saved',
+    backgroundUploadError: 'Could not save the background.',
   },
   ar: {
     appName: 'الملاحظات اللاصقة الحية',
@@ -153,6 +159,10 @@ const I18N = {
     lessonLearned: 'الدرس',
     pairCount: 'مشاركاتك',
     noSubmissionsYet: 'لا توجد مشاركات سيلفي حتى الآن.',
+    uploadBackground: 'رفع خلفية',
+    uploadingBackground: 'جاري الرفع…',
+    backgroundSaved: 'تم حفظ الخلفية',
+    backgroundUploadError: 'تعذر حفظ الخلفية.',
   },
 }
 
@@ -477,6 +487,25 @@ function BaseFacilitator({ room, roomConfig }) {
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const common = useMemo(() => commonWords(notes), [notes])
 
+  async function handleBackgroundUpload(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setBackgroundUploading(true)
+    setBackgroundMessage('')
+    try {
+      const uploaded = await uploadBackground(file)
+      await updateRoom(room, { background_data: uploaded.public_url })
+      setBackgroundMessage(t.backgroundSaved)
+      window.setTimeout(() => setBackgroundMessage(''), 2200)
+    } catch (error) {
+      console.error(error)
+      setBackgroundMessage(t.backgroundUploadError)
+    } finally {
+      setBackgroundUploading(false)
+      event.target.value = ''
+    }
+  }
+
   async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen()
     else await containerRef.current?.requestFullscreen?.()
@@ -656,16 +685,21 @@ function SuperstarWinnerDisplay({ leaders }) {
   )
 }
 
-function SuperstarFacilitator({ room }) {
+function SuperstarFacilitator({ room, roomConfig }) {
   const { t } = useLang()
   const [submissions, setSubmissions] = useState([])
   const [qrVisible, setQrVisible] = useState(true)
   const [fullscreen, setFullscreen] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
+  const [backgroundUploading, setBackgroundUploading] = useState(false)
+  const [backgroundMessage, setBackgroundMessage] = useState('')
+  const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const leaderboard = useMemo(() => buildSuperstarLeaderboard(submissions), [submissions])
+  const savedBackground = typeof roomConfig?.background_data === 'string' && roomConfig.background_data.trim() ? roomConfig.background_data.trim() : ''
+  const superstarBackground = savedBackground || superstarBanner
 
   useEffect(() => subscribeToSuperstarSubmissions(room, setSubmissions), [room])
   useEffect(() => {
@@ -705,6 +739,21 @@ function SuperstarFacilitator({ room }) {
           <button className="btn btn-ghost btn-sm" onClick={() => setQrVisible((v) => !v)}>{qrVisible ? t.hideQr : t.showQr}</button>
         </div>
         <div className="toolbar-group">
+          <input
+            ref={backgroundInputRef}
+            type="file"
+            accept="image/*"
+            className="superstar-background-input"
+            onChange={handleBackgroundUpload}
+          />
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => backgroundInputRef.current?.click()}
+            disabled={backgroundUploading}
+          >
+            {backgroundUploading ? t.uploadingBackground : t.uploadBackground}
+          </button>
+          {backgroundMessage && <span className="superstar-background-status">{backgroundMessage}</span>}
           <button className="btn btn-ghost btn-sm" onClick={takeScreenshot}>{t.screenshot}</button>
           <button className="btn btn-ghost btn-sm" onClick={() => setClearOpen(true)}>{t.clearScreen}</button>
           <button className="btn btn-ghost btn-sm" onClick={toggleFullscreen}>{fullscreen ? t.exitFullscreen : t.fullscreen}</button>
@@ -727,7 +776,7 @@ function SuperstarFacilitator({ room }) {
             {submissions.map((item) => <SuperstarFeedCard key={item.id} item={item} compact />)}
           </div>
         </div>
-        <div className="superstar-main-panel" style={{ backgroundImage: `url(${superstarBanner})` }}>
+        <div className="superstar-main-panel" style={{ backgroundImage: `url(${superstarBackground})` }}>
           <div className="superstar-main-label">{leaderboard.leaders.length > 1 ? t.tiedSuperstars : t.currentSuperstar}</div>
           <div className="superstar-winners-slot">
             {leaderboard.leaders.length === 0 ? (
@@ -784,7 +833,7 @@ function Facilitator() {
     </div>
   )
 
-  if (roomConfig?.mode === 'superstar') return <SuperstarFacilitator room={room} />
+  if (roomConfig?.mode === 'superstar') return <SuperstarFacilitator room={room} roomConfig={roomConfig} />
   return <BaseFacilitator room={room} roomConfig={roomConfig} />
 }
 
