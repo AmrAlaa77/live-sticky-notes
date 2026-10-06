@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import html2canvas from 'html2canvas'
-import superstarBanner from './assets/superstar-banner.webp'
+import superstarBanner from './assets/superstar-banner.svg'
 import {
   addNote,
   addSuperstarSubmission,
@@ -625,6 +625,37 @@ function SuperstarFeedCard({ item, compact = false }) {
   )
 }
 
+function SuperstarWinnerDisplay({ leaders }) {
+  if (leaders.length === 1) {
+    const leader = leaders[0]
+    return (
+      <div className="superstar-star-frame">
+        <div className="superstar-star-shell">
+          <img src={leader.submission.photo_url} alt={leader.name} className="superstar-star-photo" />
+        </div>
+        <div className="superstar-star-caption">
+          <div className="superstar-star-name">{leader.name}</div>
+          <div className="superstar-star-score">{leader.count}</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`superstar-winners-grid superstar-winners-${Math.min(leaders.length, 4)}`}>
+      {leaders.map((leader) => (
+        <div className="superstar-winner-card" key={leader.key}>
+          <img src={leader.submission.photo_url} alt={leader.name} className="superstar-winner-photo" />
+          <div className="superstar-winner-meta">
+            <div className="superstar-winner-name">{leader.name}</div>
+            <div className="superstar-winner-score">{leader.count}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function SuperstarFacilitator({ room }) {
   const { t } = useLang()
   const [submissions, setSubmissions] = useState([])
@@ -686,7 +717,7 @@ function SuperstarFacilitator({ room }) {
           {qrVisible && (
             <div className="superstar-qr-card">
               <div className="superstar-qr-title">{t.scanToJoin}</div>
-              <QRCodeSVG value={joinUrl} size={132} />
+              <QRCodeSVG value={joinUrl} size={132} fgColor="#5b3900" bgColor="#fff7e2" level="H" includeMargin />
               <div className="superstar-qr-code">{room}</div>
             </div>
           )}
@@ -697,22 +728,13 @@ function SuperstarFacilitator({ room }) {
           </div>
         </div>
         <div className="superstar-main-panel" style={{ backgroundImage: `url(${superstarBanner})` }}>
+          <div className="superstar-hero-title"><span className="small">The</span><span className="big">Superstar</span></div>
           <div className="superstar-main-label">{leaderboard.leaders.length > 1 ? t.tiedSuperstars : t.currentSuperstar}</div>
           <div className="superstar-winners-slot">
             {leaderboard.leaders.length === 0 ? (
               <div className="superstar-winner-empty">{t.noSubmissionsYet}</div>
             ) : (
-              <div className={`superstar-winners-grid superstar-winners-${Math.min(leaderboard.leaders.length, 4)}`}>
-                {leaderboard.leaders.map((leader) => (
-                  <div className="superstar-winner-card" key={leader.key}>
-                    <img src={leader.submission.photo_url} alt={leader.name} className="superstar-winner-photo" />
-                    <div className="superstar-winner-meta">
-                      <div className="superstar-winner-name">{leader.name}</div>
-                      <div className="superstar-winner-score">{leader.count}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <SuperstarWinnerDisplay leaders={leaderboard.leaders} />
             )}
           </div>
         </div>
