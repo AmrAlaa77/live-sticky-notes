@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import html2canvas from 'html2canvas'
-import superstarBanner from './assets/superstar-banner.svg'
+import superstarBanner from './assets/superstar-banner.webp'
 import {
   addNote,
   addSuperstarSubmission,
@@ -728,7 +728,6 @@ function SuperstarFacilitator({ room }) {
           </div>
         </div>
         <div className="superstar-main-panel" style={{ backgroundImage: `url(${superstarBanner})` }}>
-          <div className="superstar-hero-title"><span className="small">The</span><span className="big">Superstar</span></div>
           <div className="superstar-main-label">{leaderboard.leaders.length > 1 ? t.tiedSuperstars : t.currentSuperstar}</div>
           <div className="superstar-winners-slot">
             {leaderboard.leaders.length === 0 ? (
