@@ -115,10 +115,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .superstar-main-panel{position:relative;background-position:center center;background-repeat:no-repeat;background-size:contain;background-color:#c97a08;min-height:720px;isolation:isolate}
 .superstar-main-panel:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.01),rgba(0,0,0,.03));pointer-events:none}
 
-.superstar-main-label{position:absolute;left:72%;top:38%;transform:translate(-50%,-50%);z-index:3;background:rgba(87,58,6,.78);color:#fff7d6;padding:9px 15px;border-radius:999px;font-weight:800;backdrop-filter:blur(6px);box-shadow:0 8px 18px rgba(0,0,0,.16);white-space:nowrap}
-.superstar-main-label.is-empty{left:24%;top:34%}
 
-.superstar-winners-slot{position:absolute;left:72%;top:60%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;width:min(30vw,340px);height:min(30vw,340px);z-index:2}
+.superstar-winners-slot{position:absolute;left:72%;top:60%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;width:min(30vw,340px);height:min(30vw,340px);z-index:2}.superstar-winners-slot.is-draggable{cursor:grab;touch-action:none;user-select:none}.superstar-winners-slot.is-draggable:active{cursor:grabbing}.superstar-winners-slot.is-draggable img{pointer-events:none;user-select:none;-webkit-user-drag:none}
 .superstar-winners-slot.is-empty{left:24%;top:50%;width:auto;height:auto}
 
 .superstar-winner-empty{background:rgba(117,73,16,.58);color:#fff;border:1px solid rgba(255,238,192,.38);backdrop-filter:blur(8px);padding:16px 20px;border-radius:16px;text-align:center;max-width:290px;box-shadow:0 10px 24px rgba(0,0,0,.15)}
@@ -147,30 +145,24 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 @media (max-width: 1300px){
   .superstar-stage{grid-template-columns:320px minmax(0,1fr)}
   .superstar-winners-slot{left:72%;top:60%;width:min(32vw,320px);height:min(32vw,320px)}
-  .superstar-main-label{left:72%;top:39%}
-  .superstar-main-label.is-empty,.superstar-winners-slot.is-empty{left:24%}
+    
 }
 @media (max-width: 1100px){
   .superstar-stage{grid-template-columns:300px minmax(0,1fr)}
   .superstar-main-panel{min-height:680px}
   .superstar-winners-slot{left:72%;top:61%;width:min(35vw,300px);height:min(35vw,300px)}
-  .superstar-main-label{left:72%;top:40%}
-  .superstar-star-caption{min-width:195px}
+    .superstar-star-caption{min-width:195px}
 }
 @media (max-width: 900px){
   .superstar-stage{grid-template-columns:1fr}
   .superstar-feed-column{max-height:48vh}
   .superstar-main-panel{min-height:560px;background-size:contain}
   .superstar-winners-slot{left:72%;top:61%;width:min(50vw,280px);height:min(50vw,280px)}
-  .superstar-main-label{left:72%;top:40%}
-  .superstar-main-label.is-empty{left:25%;top:34%}
-  .superstar-winners-slot.is-empty{left:25%;top:50%}
+      .superstar-winners-slot.is-empty{left:25%;top:50%}
 }
 @media (max-width: 640px){
   .superstar-winners-slot{left:71%;top:62%;width:min(62vw,245px);height:min(62vw,245px)}
-  .superstar-main-label{left:71%;top:42%}
-  .superstar-main-label.is-empty{left:28%;top:34%}
-  .superstar-winners-slot.is-empty{left:28%;top:50%}
+      .superstar-winners-slot.is-empty{left:28%;top:50%}
   .superstar-star-caption{min-width:168px;padding:9px 12px}
   .superstar-star-name{font-size:.9rem}
 }
