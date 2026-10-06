@@ -139,13 +139,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 @media (max-width: 900px){.superstar-stage{grid-template-columns:1fr}.superstar-feed-column{max-height:52vh}.superstar-main-panel{min-height:560px}.superstar-winners-slot{left:75%;top:57%;width:min(52vw,290px);height:min(52vw,290px)}.superstar-main-label{left:75%;top:24%}.superstar-hero-title{top:16px;right:16px}.superstar-hero-title .small{font-size:1.35rem}.superstar-hero-title .big{font-size:2.8rem}}
 @media (max-width: 640px){.superstar-winners-slot{left:72%;top:59%;width:min(64vw,250px);height:min(64vw,250px)}.superstar-main-label{left:72%;top:27%}.superstar-main-panel{background-position:center}.superstar-star-caption{min-width:170px;padding:9px 12px}.superstar-star-name{font-size:.92rem}.superstar-hero-title{top:14px;right:14px}.superstar-hero-title .small{font-size:1.15rem}.superstar-hero-title .big{font-size:2.25rem}}
 
-
-.superstar-background-input{display:none}
-.superstar-background-status{font-size:.78rem;font-weight:700;color:#ffe7a0;white-space:nowrap}
-
-.superstar-background-upload-card{background:rgba(255,248,224,.14);border:1px solid rgba(255,241,196,.45);border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:8px;flex:0 0 auto}
-.superstar-background-upload-button{width:100%;border:1px solid #7a4b00;border-radius:12px;background:linear-gradient(180deg,#fff1b5,#d99b1e);color:#563300;font-weight:900;padding:11px 12px;cursor:pointer;box-shadow:0 5px 14px rgba(0,0,0,.18)}
-.superstar-background-upload-button:hover{filter:brightness(1.04)}
-.superstar-background-upload-button:disabled{opacity:.65;cursor:wait}
-.superstar-background-help{font-size:.73rem;line-height:1.3;color:#fff5d6}
-.superstar-background-status{font-size:.78rem;line-height:1.3;font-weight:800;color:#fff1a8;white-space:normal;overflow-wrap:anywhere}
+.superstar-background-uploader{flex:0 0 auto;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.32);border-radius:14px;padding:10px}
+.superstar-background-file{display:none}
+.superstar-background-button{width:100%;border:0;border-radius:10px;padding:11px 12px;background:#f5c04a;color:#4a2d00;font-weight:800;cursor:pointer}
+.superstar-background-button:disabled{opacity:.65;cursor:wait}
+.superstar-background-message{margin-top:7px;font-size:.78rem;line-height:1.3;color:#fff4cf;font-weight:700}
