@@ -112,7 +112,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .superstar-card-compact .superstar-card-body{display:block;padding:9px 12px 10px;min-height:68px}
 .superstar-card-compact .superstar-card-lesson{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
 
-.superstar-main-panel{position:relative;background-position:center center;background-repeat:no-repeat;background-size:contain;background-color:#c97a08;min-height:720px;isolation:isolate}
+.superstar-main-panel{position:relative;background-position:right center;background-repeat:no-repeat;background-size:cover;background-color:#c97a08;min-height:720px;isolation:isolate}
 .superstar-main-panel:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.01),rgba(0,0,0,.03));pointer-events:none}
 
 
@@ -156,7 +156,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 @media (max-width: 900px){
   .superstar-stage{grid-template-columns:1fr}
   .superstar-feed-column{max-height:48vh}
-  .superstar-main-panel{min-height:560px;background-size:contain}
+  .superstar-main-panel{min-height:560px;background-size:cover;background-position:right center}
   .superstar-winners-slot{left:72%;top:61%;width:min(50vw,280px);height:min(50vw,280px)}
       .superstar-winners-slot.is-empty{left:25%;top:50%}
 }
