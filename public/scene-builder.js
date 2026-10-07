@@ -300,6 +300,9 @@
   function applyTemplate(state) {
     const template = templateById(state.templateId)
     const isSuperstar = template.id === 'superstar'
+    window.dispatchEvent(new CustomEvent('scene-builder-template-change', {
+      detail: { room: state.room, templateId: template.id },
+    }))
     state.facilitator.classList.toggle('sb-template-mode', !isSuperstar)
     state.facilitator.classList.toggle('sb-superstar-overlay-mode', isSuperstar)
     state.scene.classList.toggle('is-superstar-overlay', isSuperstar)
