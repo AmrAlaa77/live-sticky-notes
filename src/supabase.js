@@ -148,6 +148,19 @@ export async function listBackgrounds() {
   return data || []
 }
 
+export async function renameBackground(id, name) {
+  const cleanName = String(name || '').trim()
+  if (!id || !cleanName) throw new Error('renameBackground: invalid input')
+  const { data, error } = await supabase
+    .from('sticky_backgrounds')
+    .update({ name: cleanName })
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw new Error('renameBackground: ' + error.message)
+  return data
+}
+
 export async function uploadBackground(file) {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
   const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'background'

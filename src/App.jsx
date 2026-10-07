@@ -15,6 +15,7 @@ import {
   listBackgrounds,
   moveNote,
   roomExists,
+  renameBackground,
   subscribeToNotes,
   subscribeToRoom,
   subscribeToSuperstarSubmissions,
@@ -98,6 +99,9 @@ const I18N = {
     chooseSavedBackground: 'Choose saved background',
     restoreBackground: 'Restore',
     noSavedBackgrounds: 'No saved backgrounds yet.',
+    renameBackground: 'Rename',
+    backgroundNamePlaceholder: 'Background name',
+    backgroundRenamed: 'Background renamed',
   },
   ar: {
     appName: 'الملاحظات اللاصقة الحية',
@@ -173,6 +177,9 @@ const I18N = {
     chooseSavedBackground: 'اختر خلفية محفوظة',
     restoreBackground: 'استعادة',
     noSavedBackgrounds: 'لا توجد خلفيات محفوظة حتى الآن.',
+    renameBackground: 'إعادة تسمية',
+    backgroundNamePlaceholder: 'اسم الخلفية',
+    backgroundRenamed: 'تمت إعادة تسمية الخلفية',
   },
 }
 
@@ -481,6 +488,7 @@ function BaseFacilitator({ room, roomConfig }) {
   const [backgroundMessage, setBackgroundMessage] = useState('')
   const [savedBackgrounds, setSavedBackgrounds] = useState([])
   const [selectedBackgroundId, setSelectedBackgroundId] = useState('')
+  const [backgroundRename, setBackgroundRename] = useState('')
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
@@ -501,7 +509,10 @@ function BaseFacilitator({ room, roomConfig }) {
       .then((items) => {
         if (!active) return
         setSavedBackgrounds(items)
-        if (!selectedBackgroundId && items.length) setSelectedBackgroundId(String(items[0].id))
+        if (!selectedBackgroundId && items.length) {
+          setSelectedBackgroundId(String(items[0].id))
+          setBackgroundRename(items[0].name || '')
+        }
       })
       .catch((error) => console.error('Load saved backgrounds:', error))
     return () => { active = false }
@@ -532,6 +543,7 @@ function BaseFacilitator({ room, roomConfig }) {
       await updateRoom(room, { background_data: uploaded.public_url })
       setSavedBackgrounds((current) => [uploaded, ...current.filter((item) => item.id !== uploaded.id)])
       setSelectedBackgroundId(String(uploaded.id))
+      setBackgroundRename(uploaded.name || '')
       setBackgroundMessage(t.backgroundSaved)
       window.setTimeout(() => setBackgroundMessage(''), 2500)
     } catch (error) {
@@ -540,6 +552,21 @@ function BaseFacilitator({ room, roomConfig }) {
     } finally {
       setBackgroundUploading(false)
       event.target.value = ''
+    }
+  }
+
+  async function renameSavedBackground() {
+    const cleanName = backgroundRename.trim()
+    if (!selectedBackgroundId || !cleanName) return
+    try {
+      const updated = await renameBackground(selectedBackgroundId, cleanName)
+      setSavedBackgrounds((current) => current.map((item) => String(item.id) === String(updated.id) ? updated : item))
+      setBackgroundRename(updated.name || cleanName)
+      setBackgroundMessage(t.backgroundRenamed)
+      window.setTimeout(() => setBackgroundMessage(''), 2500)
+    } catch (error) {
+      console.error('Rename Place It background:', error)
+      setBackgroundMessage(error.message || t.backgroundUploadError)
     }
   }
 
@@ -614,7 +641,12 @@ function BaseFacilitator({ room, roomConfig }) {
               <select
                 className="place-it-background-select"
                 value={selectedBackgroundId}
-                onChange={(event) => setSelectedBackgroundId(event.target.value)}
+                onChange={(event) => {
+                  const nextId = event.target.value
+                  setSelectedBackgroundId(nextId)
+                  const selected = savedBackgrounds.find((item) => String(item.id) === String(nextId))
+                  setBackgroundRename(selected?.name || '')
+                }}
                 aria-label={t.savedBackgrounds}
               >
                 <option value="">{savedBackgrounds.length ? t.chooseSavedBackground : t.noSavedBackgrounds}</option>
@@ -622,6 +654,21 @@ function BaseFacilitator({ room, roomConfig }) {
                   <option key={item.id} value={String(item.id)}>{item.name || ('Background ' + item.id)}</option>
                 ))}
               </select>
+              <input
+                className="place-it-background-name-input"
+                value={backgroundRename}
+                onChange={(event) => setBackgroundRename(event.target.value)}
+                placeholder={t.backgroundNamePlaceholder}
+                disabled={!selectedBackgroundId}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={renameSavedBackground}
+                disabled={!selectedBackgroundId || !backgroundRename.trim()}
+              >
+                {t.renameBackground}
+              </button>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
