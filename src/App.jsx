@@ -12,6 +12,7 @@ import {
   deleteNote,
   deleteParticipantNote,
   getRoom,
+  listBackgrounds,
   moveNote,
   roomExists,
   subscribeToNotes,
@@ -93,6 +94,10 @@ const I18N = {
     uploadingBackground: 'Uploading…',
     backgroundSaved: 'Background saved',
     backgroundUploadError: 'Upload failed. Please try another image.',
+    savedBackgrounds: 'Saved backgrounds',
+    chooseSavedBackground: 'Choose saved background',
+    restoreBackground: 'Restore',
+    noSavedBackgrounds: 'No saved backgrounds yet.',
   },
   ar: {
     appName: 'الملاحظات اللاصقة الحية',
@@ -164,6 +169,10 @@ const I18N = {
     uploadingBackground: 'جاري الرفع…',
     backgroundSaved: 'تم حفظ الخلفية',
     backgroundUploadError: 'فشل رفع الصورة. جرّب صورة أخرى.',
+    savedBackgrounds: 'الخلفيات المحفوظة',
+    chooseSavedBackground: 'اختر خلفية محفوظة',
+    restoreBackground: 'استعادة',
+    noSavedBackgrounds: 'لا توجد خلفيات محفوظة حتى الآن.',
   },
 }
 
@@ -470,6 +479,8 @@ function BaseFacilitator({ room, roomConfig }) {
   const [similar, setSimilar] = useState(null)
   const [backgroundUploading, setBackgroundUploading] = useState(false)
   const [backgroundMessage, setBackgroundMessage] = useState('')
+  const [savedBackgrounds, setSavedBackgrounds] = useState([])
+  const [selectedBackgroundId, setSelectedBackgroundId] = useState('')
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
@@ -482,6 +493,20 @@ function BaseFacilitator({ room, roomConfig }) {
   }, [])
 
   const placeIt = roomConfig?.mode === 'place_it'
+
+  useEffect(() => {
+    if (!placeIt) return
+    let active = true
+    listBackgrounds()
+      .then((items) => {
+        if (!active) return
+        setSavedBackgrounds(items)
+        if (!selectedBackgroundId && items.length) setSelectedBackgroundId(String(items[0].id))
+      })
+      .catch((error) => console.error('Load saved backgrounds:', error))
+    return () => { active = false }
+  }, [placeIt])
+
   useEffect(() => {
     if (placeIt || notes.length === 0 || !needsLayout(notes, qrVisible)) return
     const next = layoutNotes(notes, qrVisible)
@@ -505,6 +530,8 @@ function BaseFacilitator({ room, roomConfig }) {
     try {
       const uploaded = await uploadBackground(file)
       await updateRoom(room, { background_data: uploaded.public_url })
+      setSavedBackgrounds((current) => [uploaded, ...current.filter((item) => item.id !== uploaded.id)])
+      setSelectedBackgroundId(String(uploaded.id))
       setBackgroundMessage(t.backgroundSaved)
       window.setTimeout(() => setBackgroundMessage(''), 2500)
     } catch (error) {
@@ -513,6 +540,19 @@ function BaseFacilitator({ room, roomConfig }) {
     } finally {
       setBackgroundUploading(false)
       event.target.value = ''
+    }
+  }
+
+  async function restoreSavedBackground() {
+    const selected = savedBackgrounds.find((item) => String(item.id) === String(selectedBackgroundId))
+    if (!selected?.public_url) return
+    try {
+      await updateRoom(room, { background_data: selected.public_url })
+      setBackgroundMessage(t.backgroundSaved)
+      window.setTimeout(() => setBackgroundMessage(''), 2500)
+    } catch (error) {
+      console.error('Restore Place It background:', error)
+      setBackgroundMessage(t.backgroundUploadError)
     }
   }
 
@@ -570,6 +610,25 @@ function BaseFacilitator({ room, roomConfig }) {
                 disabled={backgroundUploading}
               >
                 {backgroundUploading ? t.uploadingBackground : t.uploadSaveBackground}
+              </button>
+              <select
+                className="place-it-background-select"
+                value={selectedBackgroundId}
+                onChange={(event) => setSelectedBackgroundId(event.target.value)}
+                aria-label={t.savedBackgrounds}
+              >
+                <option value="">{savedBackgrounds.length ? t.chooseSavedBackground : t.noSavedBackgrounds}</option>
+                {savedBackgrounds.map((item) => (
+                  <option key={item.id} value={String(item.id)}>{item.name || ('Background ' + item.id)}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={restoreSavedBackground}
+                disabled={!selectedBackgroundId}
+              >
+                {t.restoreBackground}
               </button>
               {backgroundMessage && <span className="place-it-background-message">{backgroundMessage}</span>}
             </div>
