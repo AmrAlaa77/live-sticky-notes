@@ -468,6 +468,9 @@ function BaseFacilitator({ room, roomConfig }) {
   const [clearOpen, setClearOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [similar, setSimilar] = useState(null)
+  const [backgroundUploading, setBackgroundUploading] = useState(false)
+  const [backgroundMessage, setBackgroundMessage] = useState('')
+  const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
 
@@ -487,6 +490,31 @@ function BaseFacilitator({ room, roomConfig }) {
 
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const common = useMemo(() => commonWords(notes), [notes])
+
+  async function handlePlaceItBackgroundUpload(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      setBackgroundMessage('Image must be 10 MB or smaller.')
+      event.target.value = ''
+      return
+    }
+
+    setBackgroundUploading(true)
+    setBackgroundMessage('')
+    try {
+      const uploaded = await uploadBackground(file)
+      await updateRoom(room, { background_data: uploaded.public_url })
+      setBackgroundMessage(t.backgroundSaved)
+      window.setTimeout(() => setBackgroundMessage(''), 2500)
+    } catch (error) {
+      console.error('Place It background upload:', error)
+      setBackgroundMessage(t.backgroundUploadError)
+    } finally {
+      setBackgroundUploading(false)
+      event.target.value = ''
+    }
+  }
 
   async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen()
@@ -526,6 +554,26 @@ function BaseFacilitator({ room, roomConfig }) {
         <div className="toolbar-group toolbar-left">
           <div className="room-badge"><span className="label">{t.roomCode}</span> {room}</div>
           <button className="btn btn-ghost btn-sm" onClick={() => setQrVisible((v) => !v)}>{qrVisible ? t.hideQr : t.showQr}</button>
+          {placeIt && (
+            <div className="place-it-background-control">
+              <input
+                ref={backgroundInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                onChange={handlePlaceItBackgroundUpload}
+                className="place-it-background-file"
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => backgroundInputRef.current?.click()}
+                disabled={backgroundUploading}
+              >
+                {backgroundUploading ? t.uploadingBackground : t.uploadSaveBackground}
+              </button>
+              {backgroundMessage && <span className="place-it-background-message">{backgroundMessage}</span>}
+            </div>
+          )}
           {qrVisible && (
             <div className="qr-popover">
               <QRCodeSVG value={joinUrl} size={168} />
@@ -545,7 +593,17 @@ function BaseFacilitator({ room, roomConfig }) {
         </div>
       </div>
 
-      <div ref={boardRef} className={`board ${placeIt ? 'place-it-board' : ''}`} style={placeIt ? { backgroundColor: '#fff', backgroundImage: 'none' } : undefined}>
+      <div
+        ref={boardRef}
+        className={`board ${placeIt ? 'place-it-board' : ''}`}
+        style={placeIt ? {
+          backgroundColor: '#fff',
+          backgroundImage: roomConfig?.background_data ? `url(${roomConfig.background_data})` : 'none',
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        } : undefined}
+      >
         {notes.length === 0 && <div className={`board-empty ${placeIt ? 'place-it-empty' : ''}`}>{t.emptyBoard}</div>}
         {notes.map((note) => {
           let simClass = ''

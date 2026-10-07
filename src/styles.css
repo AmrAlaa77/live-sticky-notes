@@ -175,3 +175,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
   .superstar-star-caption{min-width:168px;padding:9px 12px}
   .superstar-star-name{font-size:.9rem}
 }
+
+.place-it-background-control{display:flex;align-items:center;gap:7px}
+.place-it-background-file{display:none}
+.place-it-background-message{color:#fff4cf;font-size:.75rem;font-weight:700;white-space:nowrap}
