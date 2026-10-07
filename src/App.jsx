@@ -679,11 +679,16 @@ function SuperstarFacilitator({ room, roomConfig }) {
   const [winnerOffset, setWinnerOffset] = useState({ x: 0, y: 0 })
   const [feedRotation, setFeedRotation] = useState(0)
   const [highlightedSubmissionId, setHighlightedSubmissionId] = useState(null)
+  const [sceneNotes, setSceneNotes] = useState([])
+  const [participantFlow, setParticipantFlow] = useState('superstar')
   const winnerDragRef = useRef(null)
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
-  const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
+  const joinUrl = useMemo(
+    () => `${window.location.origin}/join/${room}${participantFlow === 'place_it' ? '?mode=place_it' : ''}`,
+    [room, participantFlow],
+  )
   const leaderboard = useMemo(() => buildSuperstarLeaderboard(submissions), [submissions])
   const latestFirst = useMemo(() => [...submissions].reverse(), [submissions])
   const feedPageSize = 6
@@ -696,6 +701,15 @@ function SuperstarFacilitator({ room, roomConfig }) {
   const secondFeedColumn = visibleFeed.slice(2, 6)
 
   useEffect(() => subscribeToSuperstarSubmissions(room, setSubmissions), [room])
+  useEffect(() => subscribeToNotes(room, setSceneNotes), [room])
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.detail?.room && event.detail.room !== room) return
+      setParticipantFlow(event.detail?.templateId === 'superstar' ? 'superstar' : 'place_it')
+    }
+    window.addEventListener('scene-builder-template-change', handler)
+    return () => window.removeEventListener('scene-builder-template-change', handler)
+  }, [room])
   useEffect(() => {
     setFeedRotation(0)
     if (!submissions.length) {
@@ -895,6 +909,23 @@ function SuperstarFacilitator({ room, roomConfig }) {
               <SuperstarWinnerDisplay leaders={leaderboard.leaders} />
             )}
           </div>
+        </div>
+        <div className="scene-sticky-overlay">
+          {sceneNotes.map((note) => (
+            <StickyNote
+              key={note.id}
+              note={note}
+              normalized
+              onMove={(id, x, y) => {
+                const board = boardRef.current
+                if (!board) return moveNote(room, id, x, y)
+                const rx = Math.min(1, Math.max(0, (x + 95) / board.clientWidth))
+                const ry = Math.min(1, Math.max(0, (y + 75) / board.clientHeight))
+                return moveNote(room, id, x, y, rx, ry)
+              }}
+              onDelete={(id) => deleteNote(room, id)}
+            />
+          ))}
         </div>
       </div>
 
@@ -1290,6 +1321,10 @@ function Participant() {
     </div>
   )
 
+  const requestedMode = new URLSearchParams(window.location.search).get('mode')
+  if (requestedMode === 'place_it') {
+    return <StickyParticipant room={room} participant={participant} roomConfig={{ ...roomConfig, mode: 'place_it' }} />
+  }
   if (roomConfig?.mode === 'superstar') return <SuperstarParticipant room={room} participant={participant} roomConfig={roomConfig} />
   return <StickyParticipant room={room} participant={participant} roomConfig={roomConfig} />
 }
