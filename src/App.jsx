@@ -526,7 +526,7 @@ function BaseFacilitator({ room, roomConfig }) {
         <div className="toolbar-group toolbar-left">
           <div className="room-badge"><span className="label">{t.roomCode}</span> {room}</div>
           <button className="btn btn-ghost btn-sm" onClick={() => setQrVisible((v) => !v)}>{qrVisible ? t.hideQr : t.showQr}</button>
-          {!placeIt && qrVisible && (
+          {qrVisible && (
             <div className="qr-popover">
               <QRCodeSVG value={joinUrl} size={168} />
               <div className="code">{room}</div>
