@@ -49,8 +49,8 @@ function Copy({value}){
    catch{window.prompt('Copy link:',value)}
  }}>{ok?'Copied':'Copy link'}</button>
 }
-function QRPanel({title,url,subtitle,resizeHandle}){
- return <section className="ifs-panel ifs-qr">
+function QRPanel({title,url,subtitle,resizeHandle,height}){
+ return <section className="ifs-panel ifs-qr" style={{height}}>
    <h2>{title}</h2><p>{subtitle}</p>
    <div className="ifs-qr-white"><QRCodeSVG value={url} size={165} level="H" marginSize={2}/></div>
    <Copy value={url}/>
@@ -225,7 +225,7 @@ function Trainer(){
        <strong>{selected.title}</strong><div className="ifs-workshop-actions"><button type="button" onClick={resetPanelSizes}>Reset panel sizes</button><span>Facilitator</span></div>
      </div>
      <div className="ifs-hero-spacer"/>
-     <main className="ifs-four-panels" ref={panelsRef} style={{gridTemplateColumns:layout.widths.map(v=>v+'%').join(' ')}}>
+     <main className="ifs-four-panels" ref={panelsRef} style={{gridTemplateColumns:layout.widths.map(v=>v+'fr').join(' ')}}>
        <section className="ifs-panel ifs-compose" style={panelStyle(0)}>
          <h2>1. Share with participants</h2><p>Text and files, including multiple attachments</p>
          <textarea value={shareText} maxLength={20000} onChange={e=>setShareText(e.target.value)} placeholder="Paste instructions, links or text here…"/>
@@ -237,7 +237,7 @@ function Trainer(){
          <div className="ifs-feed">{items.filter(i=>i.direction==='outgoing').map(i=><Item key={i.id} item={i} trainer onDelete={remove}/> )}</div>
          {resizeHandle(0)}
        </section>
-       <QRPanel title="2. Download QR" subtitle="One QR displays everything you share" url={link('download',selected.download_token)} resizeHandle={()=>resizeHandle(1)}/>
+       <QRPanel title="2. Download QR" subtitle="One QR displays everything you share" url={link('download',selected.download_token)} resizeHandle={()=>resizeHandle(1)} height={layout.heights[1]+'px'}/>
        <section className="ifs-panel ifs-inbox" style={panelStyle(2)}>
          <h2>3. Participant uploads</h2><p>Submitted names, messages and files</p>
          <div className="ifs-feed">{items.filter(i=>i.direction==='incoming').map(i=><Item key={i.id} item={i} trainer onDelete={remove}/> )}
@@ -246,7 +246,7 @@ function Trainer(){
          <button className="ifs-mini" type="button" onClick={()=>load().catch(e=>setError(e.message))}>Refresh submissions</button>
          {resizeHandle(2)}
        </section>
-       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)} resizeHandle={()=>resizeHandle(3)}/>
+       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)} resizeHandle={()=>resizeHandle(3)} height={layout.heights[3]+'px'}/>
      </main>
      {(error||notice)&&<div className={error?'ifs-notification ifs-error':'ifs-notification ifs-ok'} role="status">{error||notice}</div>}
    </>}
