@@ -1,0 +1,60 @@
+/* Instant File Sharing is isolated under ifs-* to preserve every other mode. */
+.ifs-screen,.ifs-public{font-family:Inter,system-ui,sans-serif;min-height:100vh;color:#fff}
+.ifs-screen *,.ifs-public *{box-sizing:border-box}
+.ifs-screen{display:flex;flex-direction:column;background:radial-gradient(ellipse at 70% 28%,#4988adbb,transparent 38%),linear-gradient(126deg,#05132b 5%,#103c67 51%,#00658b 100%);background-size:cover}
+.ifs-screen button,.ifs-public button{font:inherit;cursor:pointer}
+.ifs-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 22px;background:rgba(3,16,31,.79);border-bottom:1px solid #fff5}
+.ifs-top a{color:#d7f6ff;text-decoration:none;font-size:13px}
+.ifs-top strong{letter-spacing:.15em;font-size:clamp(12px,1.2vw,20px)}
+.ifs-choose{width:min(700px,94%);margin:8vh auto;background:#f0f9fff2;color:#102e48;border:1px solid #fff;border-radius:21px;padding:clamp(16px,3vw,32px);box-shadow:0 20px 55px #001b4199}
+.ifs-choose h1{font-size:clamp(19px,2vw,28px);margin:0 0 17px}
+.ifs-choose-form{display:flex;gap:9px;margin-bottom:20px}
+.ifs-choose-form input{flex:1;min-width:0;background:#fff;border:1px solid #9cb6cc;border-radius:8px;padding:13px;font-size:16px}
+.ifs-choose-form button,.ifs-primary{border:0;border-radius:9px;background:linear-gradient(100deg,#15b9db,#0875a7);color:#fff;font-weight:800;padding:11px 18px}
+.ifs-choose-form button:disabled,.ifs-primary:disabled{opacity:.56}
+.ifs-workshop-row{display:flex;align-items:stretch;gap:8px;margin-top:8px}
+.ifs-open{flex:1;min-width:0;background:#fff;border:1px solid #a2cadb;border-radius:9px;color:#173a55;padding:12px;display:flex;align-items:center;justify-content:space-between;text-align:left;font-weight:800}
+.ifs-workshop-line{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 25px;background:#071a3294;text-shadow:0 2px 5px #000a}
+.ifs-workshop-line button{color:#fff;background:#fff2;border:1px solid #fff6;border-radius:7px;padding:8px 13px}
+.ifs-workshop-line strong{font-size:clamp(13px,1.2vw,20px)}
+.ifs-workshop-line span{font-size:12px;background:#ffffff26;padding:6px 11px;border-radius:20px}
+.ifs-hero-spacer{flex:1;min-height:230px}
+.ifs-four-panels{display:grid;grid-template-columns:1.1fr .94fr 1.1fr .94fr;gap:12px;padding:12px 18px 20px;min-height:340px;max-height:480px;height:39vh}
+.ifs-panel{background:#edf8ffeb;color:#0e3454;border:1px solid #fff9;border-radius:16px;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0;padding:clamp(10px,1.1vw,18px);backdrop-filter:blur(13px);box-shadow:0 13px 36px #0005;overflow:hidden}
+.ifs-panel h2{font-size:clamp(15px,1.25vw,23px);line-height:1.1;margin:0}
+.ifs-panel h3{font-size:13px;margin:0}
+.ifs-panel>p{color:#3d5f78;font-size:12px;line-height:1.35;margin:0 0 2px}
+.ifs-compose textarea{font:inherit;border:1px solid #9fbbc9;border-radius:8px;padding:10px;min-height:58px;resize:vertical;max-height:110px}
+.ifs-filepicker{border:1px dashed #76a4bb;background:#e0f1ff;border-radius:8px;font-size:12px;font-weight:700;padding:7px;display:flex;flex-direction:column;gap:5px}
+.ifs-filepicker input{width:100%;font-size:11px}
+.ifs-panel small{font-size:11px;color:#47677d;overflow-wrap:anywhere}
+.ifs-primary{padding:10px}
+.ifs-feed{overflow-y:auto;min-height:40px;flex:1;display:flex;flex-direction:column;gap:7px;scrollbar-width:thin}
+.ifs-qr{align-items:center;justify-content:center;text-align:center;gap:11px}
+.ifs-qr-white{background:#fff;padding:8px;line-height:0;border-radius:9px;box-shadow:0 7px 20px #155a8050}
+.ifs-mini{background:#fff;color:#125378;border:1px solid #93b8ca;border-radius:6px;padding:6px 9px;font-size:11px;font-weight:750;text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.ifs-delete{color:#ad3232;border-color:#d99e9e;background:#fff3f2}
+.ifs-item{padding:9px;background:#ffffffd5;border:1px solid #bed0df;border-radius:8px;min-width:0}
+.ifs-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:5px}
+.ifs-item-meta{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ifs-item-meta strong{font-size:12px;overflow-wrap:anywhere}
+.ifs-item-meta span,.ifs-item-meta small{font-size:10px;color:#537087}
+.ifs-item-buttons{display:flex;flex-wrap:wrap;gap:4px}
+.ifs-item-text{white-space:pre-wrap;overflow-wrap:anywhere;color:#17304a;font-size:13px;line-height:1.4}
+.ifs-preview{max-width:100%;max-height:125px;object-fit:contain}
+.ifs-notification{position:fixed;top:70px;left:50%;transform:translateX(-50%);max-width:94vw;z-index:20;background:#fff;padding:12px 20px;border-radius:10px;box-shadow:0 8px 30px #0005}
+.ifs-error{color:#b1262b!important}
+.ifs-ok{color:#13784d!important}
+.ifs-public{background:#eaf4fb;color:#193952;padding-bottom:60px}
+.ifs-public>header{background:linear-gradient(110deg,#061e3f,#0b69a2);padding:34px 12px 54px;text-align:center;color:#fff}
+.ifs-public>header strong{letter-spacing:.15em;font-size:12px}
+.ifs-public>header h1{font-size:clamp(23px,5vw,37px);margin:12px 0}
+.ifs-public>header p{opacity:.88}
+.ifs-public-card{width:min(92%,650px);padding:25px;margin:-22px auto 0;position:relative;background:#fff;box-shadow:0 14px 42px #0b4c8526;border-radius:18px;display:flex;flex-direction:column;gap:11px}
+.ifs-public-card form{display:flex;flex-direction:column;gap:11px}
+.ifs-public-card label{font-size:13px;font-weight:750;display:flex;flex-direction:column;gap:5px}
+.ifs-public-card input,.ifs-public-card textarea{border:1px solid #b9cbd8;border-radius:8px;font:inherit;padding:12px;background:#fff;color:#133552;width:100%}
+.ifs-public-card textarea{min-height:120px}
+.ifs-public-card .ifs-item{background:#f1f8fd}
+@media(max-width:1100px){.ifs-four-panels{grid-template-columns:repeat(2,minmax(0,1fr));max-height:none;height:auto}.ifs-panel{min-height:290px}.ifs-hero-spacer{min-height:130px}}
+@media(max-width:620px){.ifs-four-panels{grid-template-columns:1fr;padding:10px}.ifs-panel{min-height:260px}.ifs-qr{min-height:300px}.ifs-hero-spacer{min-height:70px}.ifs-choose-form{flex-direction:column}.ifs-workshop-line{padding:9px;font-size:11px}.ifs-top strong{font-size:11px}.ifs-top{padding:10px}}
