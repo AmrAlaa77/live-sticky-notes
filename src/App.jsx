@@ -2,6 +2,7 @@
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import html2canvas from 'html2canvas'
+import InstantFileSharing from './InstantFileSharing'
 import superstarBanner from './assets/superstar-banner.svg'
 import superstarDefaultBg from './assets/superstar-default.png'
 import {
@@ -36,6 +37,8 @@ const I18N = {
     groupedDesc: 'Yellow sticky notes fill each row from left to right.',
     placeItMode: 'Place It',
     placeItDesc: 'Participants choose where their note appears on the board.',
+    instantMode: 'Instant File Sharing',
+    instantDesc: 'Two-way text and file sharing by workshop QR codes.',
     superstarMode: 'Superstar',
     superstarDesc: 'Upload selfie pairs, lessons learned, and compete to stay in the Superstar frame.',
     participantJoinHint: 'Have a room code? Join from your phone.',
@@ -114,6 +117,8 @@ const I18N = {
     groupedDesc: 'ملاحظات صفراء تُرتَّب في صفوف أفقية متتابعة مع مسافات صغيرة.',
     placeItMode: 'Place It',
     placeItDesc: 'المشاركون يختارون مكان ظهور الملاحظة على اللوحة.',
+    instantMode: 'مشاركة الملفات الفورية',
+    instantDesc: 'مشاركة النصوص والملفات بين المدرب والمشاركين عبر رموز QR لكل ورشة.',
     superstarMode: 'Superstar',
     superstarDesc: 'رفع سيلفي ثنائي مع الدروس المستفادة والتنافس للبقاء داخل إطار النجم.',
     participantJoinHint: 'عندك رمز غرفة؟ انضم من جوالك.',
@@ -225,6 +230,7 @@ function Home() {
   async function start() {
     setCreating(true)
     try {
+      if (mode === 'instant_share') { navigate('/instant'); return }
       const room = await createRoom(mode)
       navigate('/facilitator/' + room)
     } catch (e) {
@@ -268,6 +274,10 @@ function Home() {
             <button type="button" className={`mode-option ${mode === 'place_it' ? 'active' : ''}`} onClick={() => setMode('place_it')}>
               <strong>{t.placeItMode}</strong>
               <span>{t.placeItDesc}</span>
+            </button>
+            <button type="button" className={`mode-option ${mode === 'instant_share' ? 'active' : ''}`} onClick={() => setMode('instant_share')}>
+              <strong>{t.instantMode}</strong>
+              <span>{t.instantDesc}</span>
             </button>
             <button type="button" className={`mode-option ${mode === 'superstar' ? 'active' : ''}`} onClick={() => setMode('superstar')}>
               <strong>{t.superstarMode}</strong>
@@ -1772,11 +1782,19 @@ function Participant() {
   return <StickyParticipant room={room} participant={participant} roomConfig={roomConfig} />
 }
 
+function InstantPublic({ mode }) {
+  const { token = '' } = useParams()
+  return <InstantFileSharing mode={mode} token={token} />
+}
+
 export default function App() {
   return (
     <LangProvider>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/instant" element={<InstantFileSharing />} />
+        <Route path="/instant/upload/:token" element={<InstantPublic mode="upload" />} />
+        <Route path="/instant/download/:token" element={<InstantPublic mode="download" />} />
         <Route path="/facilitator/:code" element={<Facilitator />} />
         <Route path="/join/:code" element={<Participant />} />
         <Route path="*" element={<Navigate to="/" replace />} />
