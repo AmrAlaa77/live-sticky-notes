@@ -94,6 +94,19 @@ function savedPanelLayout(workshopId){
 function Trainer(){
  const [workshops,setWorkshops]=useState([])
  const [selected,setSelected]=useState(null)
+ const screenRef=useRef(null)
+ const [fullscreen,setFullscreen]=useState(false)
+ useEffect(()=>{
+   const sync=()=>setFullscreen(document.fullscreenElement===screenRef.current)
+   document.addEventListener('fullscreenchange',sync)
+   return ()=>document.removeEventListener('fullscreenchange',sync)
+ },[])
+ async function toggleFullscreen(){
+   try {
+     if(document.fullscreenElement===screenRef.current)await document.exitFullscreen()
+     else await screenRef.current?.requestFullscreen()
+   }catch(err){setError('Fullscreen unavailable: '+(err.message||String(err)))}
+ }
  const [layout,setLayout]=useState(DEFAULT_PANEL_LAYOUT)
  const resizing=useRef(null)
  const layoutRef=useRef(DEFAULT_PANEL_LAYOUT)
@@ -140,7 +153,7 @@ function Trainer(){
    setNotice('Shared instantly with participants.')
    await load()
  })
- function resizeStart(event,index){
+ function resizeStart(event,index,axis='both'){
    if(event.button!==0)return
    event.preventDefault()
    event.stopPropagation()
@@ -148,6 +161,7 @@ function Trainer(){
    resizing.current={
      id:index,x:event.clientX,y:event.clientY,
      original:layoutRef.current,
+     axis,
      panelWidth:panelsRef.current?.clientWidth||1200,
    }
  }
@@ -155,9 +169,9 @@ function Trainer(){
    if(!resizing.current)return
    event.stopPropagation()
    event.preventDefault()
-   const {id,x,y,original,panelWidth}=resizing.current
+   const {id,x,y,original,panelWidth,axis}=resizing.current
    const widths=original.widths.slice()
-   const deltaX=(event.clientX-x)/Math.max(300,panelWidth)*100
+   const deltaX=axis==='vertical'?0:(event.clientX-x)/Math.max(300,panelWidth)*100
    const partner=id===3?2:id+1
    const oldWidth=widths[id],oldNeighbor=widths[partner]
    const d=clamp(deltaX,16-oldWidth,oldNeighbor-16)
@@ -181,16 +195,28 @@ function Trainer(){
  }
  function panelStyle(index){return {height:layout.heights[index]+'px'}}
  function resizeHandle(index){
-   return <button
-     type="button"
-     className="ifs-resize-handle"
-     aria-label={'Resize panel '+(index+1)}
-     title="Drag to resize panel width and height"
-     onPointerDown={event=>resizeStart(event,index)}
-     onPointerMove={resizeMove}
-     onPointerUp={resizeFinish}
-     onPointerCancel={resizeFinish}
-   >⤡</button>
+   return <>
+     <button
+       type="button"
+       className="ifs-height-handle"
+       aria-label={'Resize panel '+(index+1)+' vertically'}
+       title="Drag up or down to change panel height"
+       onPointerDown={event=>resizeStart(event,index,'vertical')}
+       onPointerMove={resizeMove}
+       onPointerUp={resizeFinish}
+       onPointerCancel={resizeFinish}
+     >↕ Height</button>
+     <button
+       type="button"
+       className="ifs-resize-handle"
+       aria-label={'Resize panel '+(index+1)+' width and height'}
+       title="Drag diagonally to resize width and height"
+       onPointerDown={event=>resizeStart(event,index,'both')}
+       onPointerMove={resizeMove}
+       onPointerUp={resizeFinish}
+       onPointerCancel={resizeFinish}
+     >⤡</button>
+   </>
  }
  function resetPanelSizes(){
    setLayout(DEFAULT_PANEL_LAYOUT)
@@ -206,7 +232,7 @@ function Trainer(){
    if(!window.confirm('Delete workshop "'+w.title+'" and all its files and submissions permanently?'))return
    run(async()=>{await api('delete_workshop',{workshop_id:w.id});if(selected?.id===w.id){setSelected(null);setItems([])}await refresh()})
  }
- return <div className="ifs-screen">
+ return <div className="ifs-screen" ref={screenRef}>
    <header className="ifs-top"><a href="/">← Live Sticky Notes</a><strong>{TITLE}</strong></header>
    {!selected?<main className="ifs-choose">
      <h1>Choose or create a workshop</h1>
@@ -223,7 +249,7 @@ function Trainer(){
    </main>:<>
      <div className="ifs-workshop-line">
        <button type="button" onClick={()=>{setSelected(null);setItems([]);setError('')}}>← Workshops</button>
-       <strong>{selected.title}</strong><div className="ifs-workshop-actions"><button type="button" onClick={resetPanelSizes}>Reset panel sizes</button><span>Facilitator</span></div>
+       <strong>{selected.title}</strong><div className="ifs-workshop-actions"><button type="button" className="ifs-fullscreen-button" onClick={toggleFullscreen}>{fullscreen ? "⤡ Exit Fullscreen" : "⛶ Fullscreen"}</button><button type="button" onClick={resetPanelSizes}>Reset panel sizes</button><span>Facilitator</span></div>
      </div>
      <div className="ifs-hero-spacer"/>
      <main className="ifs-four-panels" ref={panelsRef} style={{gridTemplateColumns:layout.widths.map(v=>v+'fr').join(' ')}}>
