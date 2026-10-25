@@ -1,0 +1,227 @@
+import React, { useCallback, useEffect, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
+import * as tus from 'tus-js-client'
+import { supabase } from './supabase'
+import './instant-file-sharing.css'
+
+const API_FILE_LIMIT=50*1000*1000
+const MB=1024*1024
+const TITLE='INSTANT FILE SHARING'
+const fmtSize=b=>b<MB?Math.ceil(b/1024)+' KB':(b/MB).toFixed(1)+' MB'
+const link=(type,token)=>window.location.origin+'/instant/'+type+'/'+encodeURIComponent(token)
+const project=new URL(supabase.supabaseUrl).hostname.split('.')[0]
+
+async function api(action,body={}){
+  const {data,error}=await supabase.functions.invoke('instant-share',{body:{action,...body}})
+  if(error){
+    let msg=error.message
+    try{if(error.context && typeof error.context.json==='function')msg=(await error.context.json()).error||msg}catch{}
+    throw new Error(msg)
+  }
+  if(data?.error)throw new Error(data.error)
+  return data
+}
+async function sendFiles(files,base,progress){
+  for(let i=0;i<files.length;i++){
+    const file=files[i]
+    if(file.size>API_FILE_LIMIT)throw new Error('Each file must be 50 MB or smaller.')
+    const signed=await api('begin_file',{...base,file_name:file.name,file_size:file.size,mime_type:file.type||'application/octet-stream'})
+    await new Promise((resolve,reject)=>{
+      const upload=new tus.Upload(file,{
+        endpoint:'https://'+project+'.storage.supabase.co/storage/v1/upload/resumable',
+        headers:{'x-signature':signed.upload_signature},
+        metadata:{bucketName:signed.bucket,objectName:signed.path,contentType:file.type||'application/octet-stream',cacheControl:'3600'},
+        uploadDataDuringCreation:true,chunkSize:6*MB,
+        retryDelays:[0,3000,5000,10000],
+        removeFingerprintOnSuccess:true,
+        onProgress:(sent,total)=>progress('File '+(i+1)+' of '+files.length+' · '+Math.round(sent/Math.max(1,total)*100)+'%'),
+        onError:reject,onSuccess:resolve,
+      })
+      upload.findPreviousUploads().then(list=>{if(list.length)upload.resumeFromPreviousUpload(list[0]);upload.start()}).catch(reject)
+    })
+    await api('complete_file',{...base,item_id:signed.item_id})
+  }
+}
+function Copy({value}){
+ const [ok,setOk]=useState(false)
+ return <button className="ifs-mini" type="button" onClick={async()=>{
+   try{await navigator.clipboard.writeText(value);setOk(true);setTimeout(()=>setOk(false),1700)}
+   catch{window.prompt('Copy link:',value)}
+ }}>{ok?'Copied':'Copy link'}</button>
+}
+function QRPanel({title,url,subtitle}){
+ return <section className="ifs-panel ifs-qr">
+   <h2>{title}</h2><p>{subtitle}</p>
+   <div className="ifs-qr-white"><QRCodeSVG value={url} size={165} level="H" marginSize={2}/></div>
+   <Copy value={url}/>
+ </section>
+}
+function Item({item,trainer,onDelete}){
+ const [expanded,setExpanded]=useState(false)
+ return <article className="ifs-item">
+   <div className="ifs-item-top"><div className="ifs-item-meta">
+     <strong>{item.kind==='file'?item.file_name:'Text submission'}</strong>
+     {trainer && item.participant_name && <span>From {item.participant_name}</span>}
+     <small>{item.kind==='file'?fmtSize(item.file_size):'Text'} · {new Date(item.created_at).toLocaleString()}</small>
+   </div><div className="ifs-item-buttons">
+     {item.kind==='file'?(
+       item.status==='ready'?<a href={item.download_url} className="ifs-mini" download={item.file_name}>Download</a>:<small>Uploading</small>
+     ):<button className="ifs-mini" type="button" onClick={()=>setExpanded(p=>!p)}>{expanded?'Hide':'View'}</button>}
+     {trainer&&<button type="button" className="ifs-mini ifs-delete" onClick={()=>onDelete(item)}>Delete</button>}
+   </div></div>
+   {expanded&&item.kind==='text'&&<p className="ifs-item-text">{item.content}</p>}
+   {item.preview_url&&<a href={item.download_url} download={item.file_name}><img className="ifs-preview" src={item.preview_url} alt={'Preview '+item.file_name}/></a>}
+ </article>
+}
+function Trainer(){
+ const [workshops,setWorkshops]=useState([])
+ const [selected,setSelected]=useState(null)
+ const [title,setTitle]=useState('')
+ const [items,setItems]=useState([])
+ const [shareText,setShareText]=useState('')
+ const [files,setFiles]=useState([])
+ const [busy,setBusy]=useState(false)
+ const [error,setError]=useState('')
+ const [notice,setNotice]=useState('')
+ const [progress,setProgress]=useState('')
+ const refresh=useCallback(async()=>{const data=await api('workshops');setWorkshops(data.workshops||[]);return data.workshops||[]},[])
+ const load=useCallback(async()=>{
+   if(!selected)return
+   const data=await api('trainer_feed',{workshop_id:selected.id})
+   setItems(data.items||[])
+ },[selected])
+ useEffect(()=>{refresh().catch(e=>setError(e.message))},[refresh])
+ useEffect(()=>{
+   if(!selected)return
+   load().catch(e=>setError(e.message))
+   const timer=setInterval(()=>load().catch(console.error),6000)
+   return ()=>clearInterval(timer)
+ },[selected,load])
+ async function run(fn){
+   if(busy)return
+   setBusy(true);setError('');setNotice('')
+   try{await fn()}catch(e){setError(e.message||String(e))}finally{setBusy(false)}
+ }
+ const create=()=>run(async()=>{
+   const res=await api('create_workshop',{title:title.trim()})
+   await refresh();setSelected(res.workshop);setTitle('')
+   setNotice('Workshop created. Both QR codes remain the same for this workshop.')
+ })
+ const send=()=>run(async()=>{
+   if(!selected)throw new Error('Select a workshop first.')
+   if(!shareText.trim()&&!files.length)throw new Error('Add text or files first.')
+   const base={direction:'outgoing',workshop_id:selected.id}
+   if(shareText.trim())await api('add_text',{...base,content:shareText.trim()})
+   if(files.length)await sendFiles(files,base,setProgress)
+   setShareText('');setFiles([]);setProgress('')
+   setNotice('Shared instantly with participants.')
+   await load()
+ })
+ const remove=item=>{
+   if(!window.confirm('Delete this '+(item.kind==='file'?'file':'text')+' permanently?'))return
+   run(async()=>{await api('delete_item',{workshop_id:selected.id,item_id:item.id});await load()})
+ }
+ const removeWorkshop=w=>{
+   if(!window.confirm('Delete workshop "'+w.title+'" and all its files and submissions permanently?'))return
+   run(async()=>{await api('delete_workshop',{workshop_id:w.id});if(selected?.id===w.id){setSelected(null);setItems([])}await refresh()})
+ }
+ return <div className="ifs-screen">
+   <header className="ifs-top"><a href="/">← Live Sticky Notes</a><strong>{TITLE}</strong></header>
+   {!selected?<main className="ifs-choose">
+     <h1>Choose or create a workshop</h1>
+     <form onSubmit={e=>{e.preventDefault();create()}} className="ifs-choose-form">
+       <input placeholder="Workshop name" value={title} onChange={e=>setTitle(e.target.value)} required maxLength={120}/>
+       <button disabled={busy||!title.trim()}>Create workshop</button>
+     </form>
+     {workshops.map(w=><div className="ifs-workshop-row" key={w.id}>
+       <button type="button" className="ifs-open" onClick={()=>{setSelected(w);setError('')}}>{w.title}<span>Open →</span></button>
+       <button type="button" className="ifs-mini ifs-delete" disabled={busy} onClick={()=>removeWorkshop(w)}>Delete</button>
+     </div>)}
+     {!workshops.length&&<p>Create your first workshop to generate two permanent QR codes.</p>}
+     {error&&<p className="ifs-error" role="alert">{error}</p>}
+   </main>:<>
+     <div className="ifs-workshop-line">
+       <button type="button" onClick={()=>{setSelected(null);setItems([]);setError('')}}>← Workshops</button>
+       <strong>{selected.title}</strong><span>Facilitator</span>
+     </div>
+     <div className="ifs-hero-spacer"/>
+     <main className="ifs-four-panels">
+       <section className="ifs-panel ifs-compose">
+         <h2>1. Share with participants</h2><p>Text and files, including multiple attachments</p>
+         <textarea value={shareText} maxLength={20000} onChange={e=>setShareText(e.target.value)} placeholder="Paste instructions, links or text here…"/>
+         <label className="ifs-filepicker">Choose files (up to 50 MB each)<input type="file" multiple onChange={e=>setFiles(Array.from(e.target.files||[]))}/></label>
+         {files.length>0&&<small>{files.length} selected: {files.map(f=>f.name).join(', ')}</small>}
+         <button className="ifs-primary" disabled={busy} type="button" onClick={send}>{busy?'Sharing…':'Share instantly'}</button>
+         {progress&&<small>{progress}</small>}
+         <h3>Shared with participants</h3>
+         <div className="ifs-feed">{items.filter(i=>i.direction==='outgoing').map(i=><Item key={i.id} item={i} trainer onDelete={remove}/> )}</div>
+       </section>
+       <QRPanel title="2. Download QR" subtitle="One QR displays everything you share" url={link('download',selected.download_token)}/>
+       <section className="ifs-panel ifs-inbox">
+         <h2>3. Participant uploads</h2><p>Submitted names, messages and files</p>
+         <div className="ifs-feed">{items.filter(i=>i.direction==='incoming').map(i=><Item key={i.id} item={i} trainer onDelete={remove}/> )}
+           {!items.some(i=>i.direction==='incoming')&&<small>Waiting for participants…</small>}
+         </div>
+         <button className="ifs-mini" type="button" onClick={()=>load().catch(e=>setError(e.message))}>Refresh submissions</button>
+       </section>
+       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)}/>
+     </main>
+     {(error||notice)&&<div className={error?'ifs-notification ifs-error':'ifs-notification ifs-ok'} role="status">{error||notice}</div>}
+   </>}
+ </div>
+}
+function Public({mode,token}){
+ const upload=mode==='upload'
+ const [first,setFirst]=useState('')
+ const [last,setLast]=useState('')
+ const [text,setText]=useState('')
+ const [files,setFiles]=useState([])
+ const [items,setItems]=useState([])
+ const [title,setTitle]=useState('Workshop')
+ const [busy,setBusy]=useState(false)
+ const [error,setError]=useState('')
+ const [success,setSuccess]=useState('')
+ const [progress,setProgress]=useState('')
+ const reload=useCallback(async()=>{
+   if(upload)return
+   const data=await api('public_feed',{token})
+   setTitle(data.title);setItems(data.items||[])
+ },[upload,token])
+ useEffect(()=>{reload().catch(e=>setError(e.message));if(upload)return;const id=setInterval(()=>reload().catch(console.error),6000);return ()=>clearInterval(id)},[reload,upload])
+ async function submit(event){
+   event.preventDefault()
+   if(!first.trim()||!last.trim()){setError('First and last name are required.');return}
+   if(!text.trim()&&!files.length){setError('Enter text or choose files.');return}
+   setBusy(true);setError('');setSuccess('')
+   try{
+     const base={direction:'incoming',token,first_name:first.trim(),last_name:last.trim()}
+     if(text.trim())await api('add_text',{...base,content:text.trim()})
+     if(files.length)await sendFiles(files,base,setProgress)
+     setText('');setFiles([]);setProgress('');setSuccess('Submitted successfully to your trainer.')
+   }catch(e){setError(e.message||String(e))}finally{setBusy(false)}
+ }
+ return <div className="ifs-public">
+   <header><strong>{TITLE}</strong><h1>{upload?'Upload to your trainer':'Downloads from your trainer'}</h1><p>{upload?'Text and multiple files can be submitted together':title}</p></header>
+   <main className="ifs-public-card">
+     {upload?<form onSubmit={submit}>
+       <label>First name <input value={first} maxLength={50} required onChange={e=>setFirst(e.target.value)}/></label>
+       <label>Last name <input value={last} maxLength={50} required onChange={e=>setLast(e.target.value)}/></label>
+       <label>Text (optional) <textarea value={text} maxLength={20000} onChange={e=>setText(e.target.value)}/></label>
+       <label>Attach files (up to 50 MB each) <input type="file" multiple onChange={e=>setFiles(Array.from(e.target.files||[]))}/></label>
+       {files.length>0&&<p>{files.length} file(s) selected</p>}
+       <button className="ifs-primary" disabled={busy}>{busy?'Sending…':'Send to trainer'}</button>
+       {progress&&<p>{progress}</p>}
+     </form>:<>
+       <p>Everything shared during this workshop appears below and refreshes automatically.</p>
+       {items.map(i=><Item key={i.id} item={i} />)}
+       {!items.length&&!error&&<p>No downloads yet.</p>}
+       <button className="ifs-mini" onClick={()=>reload().catch(e=>setError(e.message))}>Refresh now</button>
+     </>}
+     {error&&<p className="ifs-error" role="alert">{error}</p>}
+     {success&&<p className="ifs-ok" role="status">{success}</p>}
+   </main>
+ </div>
+}
+export default function InstantFileSharing({mode='trainer',token=''}) {
+ return mode==='trainer'?<Trainer/>:<Public mode={mode} token={token}/>
+}
