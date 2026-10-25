@@ -14,6 +14,7 @@ import {
   getRoom,
   listBackgrounds,
   moveNote,
+  resizeNote,
   roomExists,
   renameBackground,
   subscribeToNotes,
@@ -563,41 +564,51 @@ function DraggableGroupedQR({ room, value, boardRef, boardWidth, boardHeight, on
   )
 }
 
-function StickyNote({ note, onMove, onDelete, simClass, common, normalized = false, grouped = false, groupedPosition = null, groupedWidth = null }) {
+function StickyNote({ note, onMove, onDelete, onResize, simClass, common, normalized = false, grouped = false, groupedPosition = null, groupedWidth = null }) {
   const [dragging, setDragging] = useState(false)
   const ref = useRef(null)
   const drag = useRef(null)
+  const resize = useRef(null)
   const pos = useRef({ x: note.x_position, y: note.y_position })
   const [localGroupedPosition, setLocalGroupedPosition] = useState(null)
+  const [localScale, setLocalScale] = useState(null)
+  const savedScale = noteScale(note)
+  const scale = localScale ?? savedScale
+  const sizeWidth = grouped
+    ? Math.min(Math.max(100, (ref.current?.parentElement?.clientWidth || 10000) - 6),
+      (groupedPosition?.width || groupedWidth || 190) * scale / savedScale)
+    : 190 * scale
+  const sizeHeight = grouped
+    ? (groupedPosition?.height || 150 * savedScale) * scale / savedScale
+    : 150 * scale
 
   useEffect(() => {
-    // Once the backend confirms a move, use its saved coordinates.
     if (grouped && note.x_ratio != null && note.y_ratio != null) setLocalGroupedPosition(null)
   }, [grouped, note.x_ratio, note.y_ratio, note.x_position, note.y_position])
-
   useEffect(() => {
     if (!drag.current) pos.current = grouped
       ? (localGroupedPosition || groupedPosition || { x: 0, y: 0 })
       : { x: note.x_position, y: note.y_position }
   }, [note.x_position, note.y_position, grouped, groupedPosition?.x, groupedPosition?.y, localGroupedPosition?.x, localGroupedPosition?.y])
+  useEffect(() => {
+    setLocalScale(null)
+  }, [note.note_scale])
 
   function pointerDown(e) {
-    if (e.target.closest('.sticky-note-delete')) return
+    if (e.target.closest('button') || e.button !== 0) return
     e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = {
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: e.clientX, startY: e.clientY,
       originX: ref.current?.offsetLeft ?? (Number(pos.current.x) || 0),
       originY: ref.current?.offsetTop ?? (Number(pos.current.y) || 0),
       moved: false,
     }
     setDragging(true)
   }
-
   function pointerMove(e) {
     if (!drag.current) return
     const parent = ref.current?.parentElement
-    const width = ref.current?.offsetWidth || groupedWidth || 190
+    const width = ref.current?.offsetWidth || sizeWidth
     const xMax = grouped && parent ? Math.max(0, parent.clientWidth - width) : Infinity
     const x = Math.min(xMax, Math.max(0, drag.current.originX + e.clientX - drag.current.startX))
     const y = Math.max(0, drag.current.originY + e.clientY - drag.current.startY)
@@ -608,7 +619,6 @@ function StickyNote({ note, onMove, onDelete, simClass, common, normalized = fal
       ref.current.style.top = y + 'px'
     }
   }
-
   function pointerUp() {
     if (!drag.current) return
     const changed = drag.current.moved
@@ -618,22 +628,58 @@ function StickyNote({ note, onMove, onDelete, simClass, common, normalized = fal
     if (changed || !grouped) onMove(note.id, pos.current.x, pos.current.y)
   }
 
+  function resizeStart(event) {
+    event.stopPropagation()
+    event.preventDefault()
+    if (event.button !== 0) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    resize.current = {
+      clientX: event.clientX, clientY: event.clientY,
+      initialScale: scale,
+      baseWidth: sizeWidth / scale,
+      baseHeight: sizeHeight / scale,
+      value: scale,
+    }
+  }
+  function resizeMove(event) {
+    if (!resize.current) return
+    event.stopPropagation()
+    event.preventDefault()
+    const r = resize.current
+    const dx = (event.clientX - r.clientX) / Math.max(1, r.baseWidth)
+    const dy = (event.clientY - r.clientY) / Math.max(1, r.baseHeight)
+    const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy
+    const next = Math.round(Math.max(0.75, Math.min(2.75, r.initialScale + delta)) * 100) / 100
+    r.value = next
+    setLocalScale(next)
+  }
+  function resizeEnd(event) {
+    if (!resize.current) return
+    event.stopPropagation()
+    event.preventDefault()
+    const next = resize.current.value
+    const original = resize.current.initialScale
+    resize.current = null
+    if (next !== original) onResize?.(note.id, next)
+  }
+
   return (
     <div
       ref={ref}
-      className={`sticky-note ${grouped ? 'grouped-sticky-note' : ''} ${dragging ? 'dragging' : ''} ${simClass || ''}`}
+      className={['sticky-note', grouped ? 'grouped-sticky-note' : '', dragging ? 'dragging' : '', simClass || ''].filter(Boolean).join(' ')}
       data-color={grouped ? 'yellow' : note.color}
       data-lang={note.lang}
       style={{
         ...(grouped ? {
           left: (localGroupedPosition || groupedPosition)?.x ?? 0,
           top: (localGroupedPosition || groupedPosition)?.y ?? 0,
-          width: groupedWidth || 190,
+          width: sizeWidth, height: sizeHeight, minHeight: 0,
           transform: 'none',
         } : {
-          left: normalized && Number.isFinite(note.x_ratio) ? `calc(${note.x_ratio * 100}% - 95px)` : note.x_position,
-          top: normalized && Number.isFinite(note.y_ratio) ? `calc(${note.y_ratio * 100}% - 75px)` : note.y_position,
-          transform: `rotate(${note.rotation || 0}deg)`,
+          left: normalized && Number.isFinite(note.x_ratio) ? 'calc(' + (note.x_ratio * 100) + '% - ' + (sizeWidth / 2) + 'px)' : note.x_position,
+          top: normalized && Number.isFinite(note.y_ratio) ? 'calc(' + (note.y_ratio * 100) + '% - ' + (sizeHeight / 2) + 'px)' : note.y_position,
+          width: sizeWidth, height: sizeHeight, minHeight: 0,
+          transform: 'rotate(' + (note.rotation || 0) + 'deg)',
         }),
         boxShadow: dragging ? '0 14px 26px rgba(0,0,0,.35)' : '3px 6px 10px rgba(0,0,0,.28)',
       }}
@@ -643,8 +689,22 @@ function StickyNote({ note, onMove, onDelete, simClass, common, normalized = fal
       onPointerCancel={pointerUp}
     >
       <button className="sticky-note-delete" type="button" onClick={() => onDelete(note.id)}>✕</button>
-      <div className="sticky-note-text">{renderHighlightedText(note.text, common)}</div>
-      <div className="sticky-note-name">{note.participant_name}</div>
+      <div className="sticky-note-text" style={{ fontSize: ((note.lang === 'ar' ? (grouped ? 1.02 : 1.05) : (grouped ? 1.12 : 1.3)) * scale) + 'rem' }}>
+        {renderHighlightedText(note.text, common)}
+      </div>
+      <div className="sticky-note-name" style={{ fontSize: (0.72 * scale) + 'rem' }}>{note.participant_name}</div>
+      {onResize && (
+        <button
+          type="button"
+          className="sticky-note-resize"
+          aria-label={'Resize sticky note from ' + note.participant_name}
+          title="Drag to resize note and text"
+          onPointerDown={resizeStart}
+          onPointerMove={resizeMove}
+          onPointerUp={resizeEnd}
+          onPointerCancel={resizeEnd}
+        >⤡</button>
+      )}
     </div>
   )
 }
