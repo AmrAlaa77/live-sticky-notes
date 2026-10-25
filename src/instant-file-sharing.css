@@ -128,3 +128,60 @@
   background-repeat:no-repeat;
   background-color:#07162c;
 }
+
+
+/* Presentation fullscreen and a large, easy-to-grab vertical resize control. */
+.ifs-screen:fullscreen{
+  width:100vw;
+  height:100vh;
+  min-height:100vh;
+  overflow-y:auto;
+  background-size:cover;
+}
+.ifs-screen:fullscreen .ifs-four-panels{margin-top:auto}
+.ifs-fullscreen-button{
+  border-color:rgba(142,226,255,.75)!important;
+  background:rgba(4,109,136,.82)!important;
+  font-weight:900!important;
+  white-space:nowrap;
+  min-height:33px;
+}
+.ifs-fullscreen-button:hover{background:#07779b!important}
+.ifs-height-handle{
+  position:absolute;
+  left:50%;
+  bottom:4px;
+  transform:translateX(-50%);
+  z-index:5;
+  min-width:110px;
+  height:31px;
+  padding:3px 12px;
+  border:1px solid #6dabc6;
+  border-radius:9px;
+  background:#f2fbff;
+  box-shadow:0 3px 9px #00315d4d;
+  color:#06446a;
+  font-weight:850;
+  font-size:13px;
+  line-height:1;
+  cursor:ns-resize!important;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.ifs-height-handle:hover,.ifs-height-handle:focus-visible{
+  background:#b8eaff;
+  box-shadow:0 0 0 2px #087ea0;
+}
+.ifs-resize-handle{
+  width:35px;
+  height:35px;
+  right:4px;
+  bottom:4px;
+}
+.ifs-panel{padding-bottom:45px}
+@media(max-width:620px){
+  .ifs-workshop-actions{gap:4px}
+  .ifs-workshop-actions button{font-size:10px;padding:5px}
+  .ifs-height-handle{min-width:95px;height:30px}
+}
