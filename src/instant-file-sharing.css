@@ -302,3 +302,15 @@
 }
 .ifs-qr-hidden-placeholder strong{font-weight:850;font-size:15px;color:#31506a}
 .ifs-qr-hidden-placeholder span{font-size:12px}
+
+
+/* Screenshot-matched 4-pane default: 26/24/26/24 proportions,
+   approx. 416/384/416/384px at 1650px viewport, only 8px between panels.
+   At 930px full-screen height, 320px panels sit near the lower edge. */
+@media (min-width:1101px){
+  .ifs-screen .ifs-four-panels{
+    column-gap:8px;
+    padding-left:14px;
+    padding-right:14px;
+  }
+}
