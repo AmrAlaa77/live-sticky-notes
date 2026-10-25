@@ -110,7 +110,7 @@ const I18N = {
     createRoom: 'إنشاء غرفة',
     chooseMode: 'اختر الوضع',
     groupedMode: 'الملاحظات المجمّعة',
-    groupedDesc: 'ملاحظات صفراء تُرتَّب أفقيًا من اليمين لليسار ثم تنتقل للسطر التالي.',
+    groupedDesc: 'ملاحظات صفراء تُرتَّب في صفوف أفقية متتابعة مع مسافات صغيرة.',
     placeItMode: 'Place It',
     placeItDesc: 'المشاركون يختارون مكان ظهور الملاحظة على اللوحة.',
     superstarMode: 'Superstar',
