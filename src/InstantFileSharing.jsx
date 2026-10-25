@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import * as tus from 'tus-js-client'
 import { supabase } from './supabase'
 import './instant-file-sharing.css'
 
@@ -9,7 +8,6 @@ const MB=1024*1024
 const TITLE='INSTANT FILE SHARING'
 const fmtSize=b=>b<MB?Math.ceil(b/1024)+' KB':(b/MB).toFixed(1)+' MB'
 const link=(type,token)=>window.location.origin+'/instant/'+type+'/'+encodeURIComponent(token)
-const project=new URL(supabase.supabaseUrl).hostname.split('.')[0]
 
 async function api(action,body={}){
   const {data,error}=await supabase.functions.invoke('instant-share',{body:{action,...body}})
@@ -25,21 +23,24 @@ async function sendFiles(files,base,progress){
   for(let i=0;i<files.length;i++){
     const file=files[i]
     if(file.size>API_FILE_LIMIT)throw new Error('Each file must be 50 MB or smaller.')
-    const signed=await api('begin_file',{...base,file_name:file.name,file_size:file.size,mime_type:file.type||'application/octet-stream'})
-    await new Promise((resolve,reject)=>{
-      const upload=new tus.Upload(file,{
-        endpoint:'https://'+project+'.storage.supabase.co/storage/v1/upload/resumable',
-        headers:{'x-signature':signed.upload_signature},
-        metadata:{bucketName:signed.bucket,objectName:signed.path,contentType:file.type||'application/octet-stream',cacheControl:'3600'},
-        uploadDataDuringCreation:true,chunkSize:6*MB,
-        retryDelays:[0,3000,5000,10000],
-        removeFingerprintOnSuccess:true,
-        onProgress:(sent,total)=>progress('File '+(i+1)+' of '+files.length+' · '+Math.round(sent/Math.max(1,total)*100)+'%'),
-        onError:reject,onSuccess:resolve,
-      })
-      upload.findPreviousUploads().then(list=>{if(list.length)upload.resumeFromPreviousUpload(list[0]);upload.start()}).catch(reject)
+    progress('Uploading '+(i+1)+' of '+files.length+': '+file.name)
+    const signed=await api('begin_file',{
+      ...base,file_name:file.name,file_size:file.size,
+      mime_type:file.type||'application/octet-stream'
     })
+    // Use the standard Supabase signed-upload endpoint. The former TUS route
+    // rejected signed tokens with "Invalid Compact JWS" in hosted Storage.
+    // This method uses the token exactly as returned by createSignedUploadUrl.
+    const {error}=await supabase.storage.from(signed.bucket).uploadToSignedUrl(
+      signed.path,signed.upload_signature,file,{
+        contentType:file.type||'application/octet-stream',
+        cacheControl:'3600',
+      }
+    )
+    if(error)throw new Error('Upload failed for '+file.name+': '+error.message)
+    progress('Verifying file '+(i+1)+' of '+files.length)
     await api('complete_file',{...base,item_id:signed.item_id})
+    progress('Uploaded '+(i+1)+' of '+files.length)
   }
 }
 function Copy({value}){
