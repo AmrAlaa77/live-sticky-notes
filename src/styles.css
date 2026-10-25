@@ -316,3 +316,64 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 @media(max-width:640px){
   .board.grouped-sticky-board .sticky-note{height:136px}
 }
+
+
+/* Facilitator board: move the QR code by dragging anywhere on its white card. */
+.grouped-draggable-qr{
+  position:absolute;
+  z-index:28;
+  width:200px;
+  height:236px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:4px;
+  padding:7px 9px;
+  background:#fff;
+  color:#24211c;
+  border:2px solid #fff;
+  border-radius:9px;
+  box-shadow:0 9px 25px #0007;
+  cursor:grab;
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:none;
+}
+.grouped-draggable-qr:active{cursor:grabbing;box-shadow:0 15px 32px #0008}
+.grouped-qr-drag-title{font-size:11px;font-weight:900;letter-spacing:.035em;color:#726349;line-height:1.2}
+.grouped-draggable-qr svg{width:154px;height:154px;flex:0 0 auto}
+.grouped-draggable-qr .code{font-size:17px;letter-spacing:.12em;font-weight:900;line-height:1.15}
+.grouped-draggable-qr p{font-size:11px;color:#66625c;line-height:1.15;margin:0;text-align:center}
+
+/* Every facilitator sticky note has a bottom-right grip.
+   Its drag scales the whole note and the text, without affecting move or delete. */
+.sticky-note-resize{
+  position:absolute;
+  z-index:30;
+  right:2px;
+  bottom:2px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:25px;
+  height:25px;
+  border-radius:3px;
+  border:1px solid rgba(71,55,21,.45);
+  background:rgba(255,255,255,.67);
+  color:#3a2f14;
+  font-size:21px;
+  font-weight:900;
+  line-height:1;
+  cursor:nwse-resize;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.sticky-note-resize:hover,.sticky-note-resize:focus-visible{
+  background:#fff5c1;
+  outline:2px solid #744900;
+  outline-offset:1px;
+}
+.sticky-note-text{overflow-wrap:anywhere;overflow-y:auto;max-height:100%;scrollbar-width:thin}
+.sticky-note-name{max-width:calc(100% - 45px)}
