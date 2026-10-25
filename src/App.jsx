@@ -417,49 +417,150 @@ function needsLayout(notes, qrVisible) {
 // Grouped mode packs notes left-to-right with a small, consistent gap.
 // Only a note explicitly dragged by the facilitator stores a custom position.
 // x_ratio/y_ratio indicate a pinned note; other notes stay in automatic rows.
-function groupedRowLayout(notes, viewportWidth) {
-  const boardWidth = Math.max(200, Number(viewportWidth) || 1200)
+const GROUPED_QR_WIDTH = 200
+const GROUPED_QR_HEIGHT = 236
+
+function noteScale(note) {
+  const value = Number(note?.note_scale)
+  return Number.isFinite(value) ? Math.min(2.75, Math.max(0.75, value)) : 1
+}
+
+// Pack yellow notes left-to-right in close rows, skipping manually pinned notes and QR.
+function groupedRowLayout(notes, viewportWidth, qrBlock = null) {
+  const boardWidth = Math.max(220, Number(viewportWidth) || 1200)
   const narrow = boardWidth < 640
   const padding = narrow ? 3 : 5
   const gap = narrow ? 3 : 4
   const minWidth = narrow ? 135 : 160
-  const noteHeight = narrow ? 136 : 150
+  const defaultHeight = narrow ? 136 : 150
   const columns = Math.max(1, Math.floor((boardWidth - 2 * padding + gap) / (minWidth + gap)))
-  const width = (boardWidth - 2 * padding - (columns - 1) * gap) / columns
+  const baseWidth = (boardWidth - 2 * padding - (columns - 1) * gap) / columns
+  const dimensions = new Map()
   const positions = new Map()
-  const moved = notes.filter((note) => note.x_ratio != null && note.y_ratio != null)
-  const pinnedRects = []
-  let bottom = noteHeight + padding * 2
+  const occupied = qrBlock ? [{ ...qrBlock }] : []
+  let bottom = padding
 
-  for (const note of moved) {
-    const usableWidth = Math.max(0, boardWidth - width - padding * 2)
-    const x = Math.max(padding, Math.min(boardWidth - width - padding,
-      padding + Number(note.x_ratio) * usableWidth))
-    const y = Math.max(padding, Number(note.y_position) || padding)
-    positions.set(note.id, { x, y })
-    pinnedRects.push({ x, y })
-    bottom = Math.max(bottom, y + noteHeight + padding)
+  for (const note of notes) {
+    const scale = noteScale(note)
+    const width = Math.min(boardWidth - padding * 2, baseWidth * scale)
+    const height = defaultHeight * scale
+    dimensions.set(note.id, { width, height, scale })
   }
-  let index = 0
+
+  // A manually moved note retains its saved location and size.
+  for (const note of notes) {
+    if (note.x_ratio == null || note.y_ratio == null) continue
+    const { width, height } = dimensions.get(note.id)
+    const usableWidth = Math.max(0, boardWidth - width - 2 * padding)
+    const ratio = Math.min(1, Math.max(0, Number(note.x_ratio) || 0))
+    const x = padding + ratio * usableWidth
+    const y = Math.max(padding, Number(note.y_position) || padding)
+    positions.set(note.id, { x, y, width, height })
+    occupied.push({ x, y, width, height })
+    bottom = Math.max(bottom, y + height + padding)
+  }
+
+  let cursorX = padding
+  let cursorY = padding
+  let rowHeight = 0
   for (const note of notes) {
     if (positions.has(note.id)) continue
-    while (true) {
-      const column = index % columns
-      const row = Math.floor(index / columns)
-      const x = padding + column * (width + gap)
-      const y = padding + row * (noteHeight + gap)
-      index++
-      // Keep newly arriving notes from covering notes manually moved here.
-      const intersectsPinned = pinnedRects.some((pin) =>
-        x < pin.x + width + gap && pin.x < x + width + gap &&
-        y < pin.y + noteHeight + gap && pin.y < y + noteHeight + gap)
-      if (intersectsPinned) continue
-      positions.set(note.id, { x, y })
-      bottom = Math.max(bottom, y + noteHeight + padding)
+    const { width, height } = dimensions.get(note.id)
+    let attempts = 0
+    while (++attempts < 10000) {
+      if (cursorX + width > boardWidth - padding + 0.5) {
+        cursorX = padding
+        cursorY += Math.max(rowHeight, gap) + gap
+        rowHeight = 0
+      }
+      const blocked = occupied.find((rect) => {
+        const w = rect.width ?? rect.w
+        const h = rect.height ?? rect.h
+        return cursorX < rect.x + w + gap &&
+          rect.x < cursorX + width + gap &&
+          cursorY < rect.y + h + gap &&
+          rect.y < cursorY + height + gap
+      })
+      if (blocked) {
+        const w = blocked.width ?? blocked.w
+        const h = blocked.height ?? blocked.h
+        if (blocked.x + w + gap + width <= boardWidth - padding) {
+          cursorX = blocked.x + w + gap
+        } else {
+          cursorX = padding
+          cursorY = Math.max(cursorY + Math.max(rowHeight, gap) + gap, blocked.y + h + gap)
+          rowHeight = 0
+        }
+        continue
+      }
+      positions.set(note.id, { x: cursorX, y: cursorY, width, height })
+      bottom = Math.max(bottom, cursorY + height + padding)
+      cursorX += width + gap
+      rowHeight = Math.max(rowHeight, height)
       break
     }
   }
-  return { positions, width, height: bottom }
+  return { positions, width: baseWidth, height: bottom }
+}
+
+function storedQRPosition(room) {
+  try {
+    const p = JSON.parse(localStorage.getItem('sticky-notes-qr-position-' + room) || 'null')
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+      return { x: Math.max(0, Math.min(1, p.x)), y: Math.max(0, Math.min(1, p.y)) }
+    }
+  } catch { /* No saved position */ }
+  return { x: 0.01, y: 0.02 }
+}
+
+function DraggableGroupedQR({ room, value, boardRef, boardWidth, boardHeight, onChange, title }) {
+  const ref = useRef(null)
+  const pointer = useRef(null)
+  const [preview, setPreview] = useState(null)
+  const maxX = Math.max(0, boardWidth - GROUPED_QR_WIDTH)
+  const maxY = Math.max(0, boardHeight - GROUPED_QR_HEIGHT)
+  const point = preview || { x: Math.round(value.x * maxX), y: Math.round(value.y * maxY) }
+
+  function start(event) {
+    if (event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    pointer.current = { x: point.x, y: point.y, clientX: event.clientX, clientY: event.clientY }
+  }
+  function move(event) {
+    if (!pointer.current) return
+    event.stopPropagation()
+    const x = Math.max(0, Math.min(maxX, pointer.current.x + event.clientX - pointer.current.clientX))
+    const y = Math.max(0, Math.min(maxY, pointer.current.y + event.clientY - pointer.current.clientY))
+    setPreview({ x, y })
+  }
+  function finish(event) {
+    if (!pointer.current) return
+    event.stopPropagation()
+    const x = Math.max(0, Math.min(maxX, pointer.current.x + event.clientX - pointer.current.clientX))
+    const y = Math.max(0, Math.min(maxY, pointer.current.y + event.clientY - pointer.current.clientY))
+    pointer.current = null
+    setPreview(null)
+    onChange({ x: maxX ? x / maxX : 0, y: maxY ? y / maxY : 0 })
+  }
+  return (
+    <div
+      ref={ref}
+      className="grouped-draggable-qr"
+      style={{ left: point.x, top: point.y }}
+      aria-label="QR code. Drag to move."
+      onPointerDown={start}
+      onPointerMove={move}
+      onPointerUp={finish}
+      onPointerCancel={finish}
+    >
+      <div className="grouped-qr-drag-title">⋮⋮ DRAG QR TO MOVE</div>
+      <QRCodeSVG value={value} size={154} />
+      <div className="code">{room}</div>
+      <p>{title}</p>
+    </div>
+  )
 }
 
 function StickyNote({ note, onMove, onDelete, simClass, common, normalized = false, grouped = false, groupedPosition = null, groupedWidth = null }) {
