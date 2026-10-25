@@ -99,12 +99,14 @@ function Item({item,trainer,onDelete}){
  </article>
 }
 
-const DEFAULT_PANEL_LAYOUT={widths:[26,24,26,24],heights:[335,335,335,335]}
+// Screenshot-matched compact default for the four workshop panels.
+const DEFAULT_PANEL_LAYOUT={widths:[26,24,26,24],heights:[320,320,320,320]}
+const PANEL_LAYOUT_STORAGE_PREFIX='ifs-panel-layout-v2-'
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value))
 function savedPanelLayout(workshopId){
   if(!workshopId)return DEFAULT_PANEL_LAYOUT
   try{
-    const entry=JSON.parse(localStorage.getItem('ifs-panel-layout-'+workshopId)||'null')
+    const entry=JSON.parse(localStorage.getItem(PANEL_LAYOUT_STORAGE_PREFIX+workshopId)||'null')
     if(Array.isArray(entry?.widths)&&entry.widths.length===4
        &&Array.isArray(entry.heights)&&entry.heights.length===4
        &&entry.widths.every(v=>Number.isFinite(v)&&v>=14&&v<=52)
@@ -234,7 +236,7 @@ function Trainer(){
    event.preventDefault()
    resizing.current=null
    if(selected){
-     try{localStorage.setItem('ifs-panel-layout-'+selected.id,JSON.stringify(layoutRef.current))}catch{}
+     try{localStorage.setItem(PANEL_LAYOUT_STORAGE_PREFIX+selected.id,JSON.stringify(layoutRef.current))}catch{}
    }
  }
  function panelStyle(index){return {height:layout.heights[index]+'px'}}
@@ -265,7 +267,7 @@ function Trainer(){
  function resetPanelSizes(){
    setLayout(DEFAULT_PANEL_LAYOUT)
    layoutRef.current=DEFAULT_PANEL_LAYOUT
-   if(selected)try{localStorage.removeItem('ifs-panel-layout-'+selected.id)}catch{}
+   if(selected)try{localStorage.removeItem(PANEL_LAYOUT_STORAGE_PREFIX+selected.id)}catch{}
  }
 
  const remove=item=>{
