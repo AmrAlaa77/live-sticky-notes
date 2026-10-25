@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import * as tus from 'tus-js-client'
 import { supabase } from './supabase'
@@ -49,11 +49,12 @@ function Copy({value}){
    catch{window.prompt('Copy link:',value)}
  }}>{ok?'Copied':'Copy link'}</button>
 }
-function QRPanel({title,url,subtitle}){
+function QRPanel({title,url,subtitle,resizeHandle}){
  return <section className="ifs-panel ifs-qr">
    <h2>{title}</h2><p>{subtitle}</p>
    <div className="ifs-qr-white"><QRCodeSVG value={url} size={165} level="H" marginSize={2}/></div>
    <Copy value={url}/>
+   {resizeHandle?.()}
  </section>
 }
 function Item({item,trainer,onDelete}){
@@ -73,9 +74,30 @@ function Item({item,trainer,onDelete}){
    {item.preview_url&&<a href={item.download_url} download={item.file_name}><img className="ifs-preview" src={item.preview_url} alt={'Preview '+item.file_name}/></a>}
  </article>
 }
+
+const DEFAULT_PANEL_LAYOUT={widths:[26,24,26,24],heights:[335,335,335,335]}
+const clamp=(value,min,max)=>Math.max(min,Math.min(max,value))
+function savedPanelLayout(workshopId){
+  if(!workshopId)return DEFAULT_PANEL_LAYOUT
+  try{
+    const entry=JSON.parse(localStorage.getItem('ifs-panel-layout-'+workshopId)||'null')
+    if(Array.isArray(entry?.widths)&&entry.widths.length===4
+       &&Array.isArray(entry.heights)&&entry.heights.length===4
+       &&entry.widths.every(v=>Number.isFinite(v)&&v>=14&&v<=52)
+       &&entry.heights.every(v=>Number.isFinite(v)&&v>=260&&v<=960)
+       &&Math.abs(entry.widths.reduce((a,b)=>a+b,0)-100)<.2)return entry
+  }catch{}
+  return DEFAULT_PANEL_LAYOUT
+}
+
 function Trainer(){
  const [workshops,setWorkshops]=useState([])
  const [selected,setSelected]=useState(null)
+ const [layout,setLayout]=useState(DEFAULT_PANEL_LAYOUT)
+ const resizing=useRef(null)
+ const layoutRef=useRef(DEFAULT_PANEL_LAYOUT)
+ const panelsRef=useRef(null)
+ useEffect(()=>{const saved=savedPanelLayout(selected?.id);setLayout(saved);layoutRef.current=saved},[selected?.id])
  const [title,setTitle]=useState('')
  const [items,setItems]=useState([])
  const [shareText,setShareText]=useState('')
@@ -117,6 +139,64 @@ function Trainer(){
    setNotice('Shared instantly with participants.')
    await load()
  })
+ function resizeStart(event,index){
+   if(event.button!==0)return
+   event.preventDefault()
+   event.stopPropagation()
+   event.currentTarget.setPointerCapture(event.pointerId)
+   resizing.current={
+     id:index,x:event.clientX,y:event.clientY,
+     original:layoutRef.current,
+     panelWidth:panelsRef.current?.clientWidth||1200,
+   }
+ }
+ function resizeMove(event){
+   if(!resizing.current)return
+   event.stopPropagation()
+   event.preventDefault()
+   const {id,x,y,original,panelWidth}=resizing.current
+   const widths=original.widths.slice()
+   const deltaX=(event.clientX-x)/Math.max(300,panelWidth)*100
+   const partner=id===3?2:id+1
+   const oldWidth=widths[id],oldNeighbor=widths[partner]
+   const d=clamp(deltaX,16-oldWidth,oldNeighbor-16)
+   widths[id]=Math.round((oldWidth+d)*100)/100
+   widths[partner]=Math.round((oldNeighbor-d)*100)/100
+   // Resize height of just this panel; horizontal drag changes one shared border.
+   const heights=original.heights.slice()
+   heights[id]=clamp(Math.round(original.heights[id]+event.clientY-y),260,960)
+   const next={widths,heights}
+   layoutRef.current=next
+   setLayout(next)
+ }
+ function resizeFinish(event){
+   if(!resizing.current)return
+   event.stopPropagation()
+   event.preventDefault()
+   resizing.current=null
+   if(selected){
+     try{localStorage.setItem('ifs-panel-layout-'+selected.id,JSON.stringify(layoutRef.current))}catch{}
+   }
+ }
+ function panelStyle(index){return {height:layout.heights[index]+'px'}}
+ function resizeHandle(index){
+   return <button
+     type="button"
+     className="ifs-resize-handle"
+     aria-label={'Resize panel '+(index+1)}
+     title="Drag to resize panel width and height"
+     onPointerDown={event=>resizeStart(event,index)}
+     onPointerMove={resizeMove}
+     onPointerUp={resizeFinish}
+     onPointerCancel={resizeFinish}
+   >⤡</button>
+ }
+ function resetPanelSizes(){
+   setLayout(DEFAULT_PANEL_LAYOUT)
+   layoutRef.current=DEFAULT_PANEL_LAYOUT
+   if(selected)try{localStorage.removeItem('ifs-panel-layout-'+selected.id)}catch{}
+ }
+
  const remove=item=>{
    if(!window.confirm('Delete this '+(item.kind==='file'?'file':'text')+' permanently?'))return
    run(async()=>{await api('delete_item',{workshop_id:selected.id,item_id:item.id});await load()})
@@ -142,11 +222,11 @@ function Trainer(){
    </main>:<>
      <div className="ifs-workshop-line">
        <button type="button" onClick={()=>{setSelected(null);setItems([]);setError('')}}>← Workshops</button>
-       <strong>{selected.title}</strong><span>Facilitator</span>
+       <strong>{selected.title}</strong><div className="ifs-workshop-actions"><button type="button" onClick={resetPanelSizes}>Reset panel sizes</button><span>Facilitator</span></div>
      </div>
      <div className="ifs-hero-spacer"/>
-     <main className="ifs-four-panels">
-       <section className="ifs-panel ifs-compose">
+     <main className="ifs-four-panels" ref={panelsRef} style={{gridTemplateColumns:layout.widths.map(v=>v+'%').join(' ')}}>
+       <section className="ifs-panel ifs-compose" style={panelStyle(0)}>
          <h2>1. Share with participants</h2><p>Text and files, including multiple attachments</p>
          <textarea value={shareText} maxLength={20000} onChange={e=>setShareText(e.target.value)} placeholder="Paste instructions, links or text here…"/>
          <label className="ifs-filepicker">Choose files (up to 50 MB each)<input type="file" multiple onChange={e=>setFiles(Array.from(e.target.files||[]))}/></label>
@@ -155,16 +235,18 @@ function Trainer(){
          {progress&&<small>{progress}</small>}
          <h3>Shared with participants</h3>
          <div className="ifs-feed">{items.filter(i=>i.direction==='outgoing').map(i=><Item key={i.id} item={i} trainer onDelete={remove}/> )}</div>
+         {resizeHandle(0)}
        </section>
-       <QRPanel title="2. Download QR" subtitle="One QR displays everything you share" url={link('download',selected.download_token)}/>
-       <section className="ifs-panel ifs-inbox">
+       <QRPanel title="2. Download QR" subtitle="One QR displays everything you share" url={link('download',selected.download_token)} resizeHandle={()=>resizeHandle(1)}/>
+       <section className="ifs-panel ifs-inbox" style={panelStyle(2)}>
          <h2>3. Participant uploads</h2><p>Submitted names, messages and files</p>
          <div className="ifs-feed">{items.filter(i=>i.direction==='incoming').map(i=><Item key={i.id} item={i} trainer onDelete={remove}/> )}
            {!items.some(i=>i.direction==='incoming')&&<small>Waiting for participants…</small>}
          </div>
          <button className="ifs-mini" type="button" onClick={()=>load().catch(e=>setError(e.message))}>Refresh submissions</button>
+         {resizeHandle(2)}
        </section>
-       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)}/>
+       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)} resizeHandle={()=>resizeHandle(3)}/>
      </main>
      {(error||notice)&&<div className={error?'ifs-notification ifs-error':'ifs-notification ifs-ok'} role="status">{error||notice}</div>}
    </>}
