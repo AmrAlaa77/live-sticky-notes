@@ -413,15 +413,72 @@ function needsLayout(notes, qrVisible) {
   return false
 }
 
-function StickyNote({ note, onMove, onDelete, simClass, common, normalized = false, grouped = false }) {
+
+// Grouped mode packs notes left-to-right with a small, consistent gap.
+// Only a note explicitly dragged by the facilitator stores a custom position.
+// x_ratio/y_ratio indicate a pinned note; other notes stay in automatic rows.
+function groupedRowLayout(notes, viewportWidth) {
+  const boardWidth = Math.max(200, Number(viewportWidth) || 1200)
+  const narrow = boardWidth < 640
+  const padding = narrow ? 3 : 5
+  const gap = narrow ? 3 : 4
+  const minWidth = narrow ? 135 : 160
+  const noteHeight = narrow ? 136 : 150
+  const columns = Math.max(1, Math.floor((boardWidth - 2 * padding + gap) / (minWidth + gap)))
+  const width = (boardWidth - 2 * padding - (columns - 1) * gap) / columns
+  const positions = new Map()
+  const moved = notes.filter((note) => note.x_ratio != null && note.y_ratio != null)
+  const pinnedRects = []
+  let bottom = noteHeight + padding * 2
+
+  for (const note of moved) {
+    const usableWidth = Math.max(0, boardWidth - width - padding * 2)
+    const x = Math.max(padding, Math.min(boardWidth - width - padding,
+      padding + Number(note.x_ratio) * usableWidth))
+    const y = Math.max(padding, Number(note.y_position) || padding)
+    positions.set(note.id, { x, y })
+    pinnedRects.push({ x, y })
+    bottom = Math.max(bottom, y + noteHeight + padding)
+  }
+  let index = 0
+  for (const note of notes) {
+    if (positions.has(note.id)) continue
+    while (true) {
+      const column = index % columns
+      const row = Math.floor(index / columns)
+      const x = padding + column * (width + gap)
+      const y = padding + row * (noteHeight + gap)
+      index++
+      // Keep newly arriving notes from covering notes manually moved here.
+      const intersectsPinned = pinnedRects.some((pin) =>
+        x < pin.x + width + gap && pin.x < x + width + gap &&
+        y < pin.y + noteHeight + gap && pin.y < y + noteHeight + gap)
+      if (intersectsPinned) continue
+      positions.set(note.id, { x, y })
+      bottom = Math.max(bottom, y + noteHeight + padding)
+      break
+    }
+  }
+  return { positions, width, height: bottom }
+}
+
+function StickyNote({ note, onMove, onDelete, simClass, common, normalized = false, grouped = false, groupedPosition = null, groupedWidth = null }) {
   const [dragging, setDragging] = useState(false)
   const ref = useRef(null)
   const drag = useRef(null)
   const pos = useRef({ x: note.x_position, y: note.y_position })
+  const [localGroupedPosition, setLocalGroupedPosition] = useState(null)
 
   useEffect(() => {
-    if (!drag.current) pos.current = { x: note.x_position, y: note.y_position }
-  }, [note.x_position, note.y_position])
+    // Once the backend confirms a move, use its saved coordinates.
+    if (grouped && note.x_ratio != null && note.y_ratio != null) setLocalGroupedPosition(null)
+  }, [grouped, note.x_ratio, note.y_ratio, note.x_position, note.y_position])
+
+  useEffect(() => {
+    if (!drag.current) pos.current = grouped
+      ? (localGroupedPosition || groupedPosition || { x: 0, y: 0 })
+      : { x: note.x_position, y: note.y_position }
+  }, [note.x_position, note.y_position, grouped, groupedPosition?.x, groupedPosition?.y, localGroupedPosition?.x, localGroupedPosition?.y])
 
   function pointerDown(e) {
     if (e.target.closest('.sticky-note-delete')) return
@@ -431,14 +488,19 @@ function StickyNote({ note, onMove, onDelete, simClass, common, normalized = fal
       startY: e.clientY,
       originX: ref.current?.offsetLeft ?? (Number(pos.current.x) || 0),
       originY: ref.current?.offsetTop ?? (Number(pos.current.y) || 0),
+      moved: false,
     }
     setDragging(true)
   }
 
   function pointerMove(e) {
     if (!drag.current) return
-    const x = Math.max(0, drag.current.originX + e.clientX - drag.current.startX)
+    const parent = ref.current?.parentElement
+    const width = ref.current?.offsetWidth || groupedWidth || 190
+    const xMax = grouped && parent ? Math.max(0, parent.clientWidth - width) : Infinity
+    const x = Math.min(xMax, Math.max(0, drag.current.originX + e.clientX - drag.current.startX))
     const y = Math.max(0, drag.current.originY + e.clientY - drag.current.startY)
+    if (Math.abs(e.clientX - drag.current.startX) > 3 || Math.abs(e.clientY - drag.current.startY) > 3) drag.current.moved = true
     pos.current = { x, y }
     if (ref.current) {
       ref.current.style.left = x + 'px'
@@ -448,9 +510,11 @@ function StickyNote({ note, onMove, onDelete, simClass, common, normalized = fal
 
   function pointerUp() {
     if (!drag.current) return
+    const changed = drag.current.moved
     drag.current = null
+    if (grouped && changed) setLocalGroupedPosition({ ...pos.current })
     setDragging(false)
-    onMove(note.id, pos.current.x, pos.current.y)
+    if (changed || !grouped) onMove(note.id, pos.current.x, pos.current.y)
   }
 
   return (
@@ -460,17 +524,22 @@ function StickyNote({ note, onMove, onDelete, simClass, common, normalized = fal
       data-color={grouped ? 'yellow' : note.color}
       data-lang={note.lang}
       style={{
-        ...(grouped ? {} : {
+        ...(grouped ? {
+          left: (localGroupedPosition || groupedPosition)?.x ?? 0,
+          top: (localGroupedPosition || groupedPosition)?.y ?? 0,
+          width: groupedWidth || 190,
+          transform: 'none',
+        } : {
           left: normalized && Number.isFinite(note.x_ratio) ? `calc(${note.x_ratio * 100}% - 95px)` : note.x_position,
           top: normalized && Number.isFinite(note.y_ratio) ? `calc(${note.y_ratio * 100}% - 75px)` : note.y_position,
           transform: `rotate(${note.rotation || 0}deg)`,
         }),
         boxShadow: dragging ? '0 14px 26px rgba(0,0,0,.35)' : '3px 6px 10px rgba(0,0,0,.28)',
       }}
-      onPointerDown={grouped ? undefined : pointerDown}
-      onPointerMove={grouped ? undefined : pointerMove}
-      onPointerUp={grouped ? undefined : pointerUp}
-      onPointerCancel={grouped ? undefined : pointerUp}
+      onPointerDown={pointerDown}
+      onPointerMove={pointerMove}
+      onPointerUp={pointerUp}
+      onPointerCancel={pointerUp}
     >
       <button className="sticky-note-delete" type="button" onClick={() => onDelete(note.id)}>✕</button>
       <div className="sticky-note-text">{renderHighlightedText(note.text, common)}</div>
@@ -494,6 +563,7 @@ function BaseFacilitator({ room, roomConfig }) {
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
+  const [groupedBoardWidth, setGroupedBoardWidth] = useState(1200)
 
   useEffect(() => subscribeToNotes(room, setNotes), [room])
   useEffect(() => {
@@ -520,7 +590,25 @@ function BaseFacilitator({ room, roomConfig }) {
     return () => { active = false }
   }, [placeIt])
 
-  // Grouped notes use CSS row-first layout; no background database repositioning.
+  // Automatically fill horizontal rows; manual drags keep their saved locations.
+  useEffect(() => {
+    if (placeIt || !boardRef.current) return
+    const board = boardRef.current
+    const measure = () => setGroupedBoardWidth((prev) => board.clientWidth || prev)
+    measure()
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(measure)
+      observer.observe(board)
+      return () => observer.disconnect()
+    }
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [placeIt])
+
+  const groupedLayout = useMemo(
+    () => groupedRowLayout(notes, groupedBoardWidth),
+    [notes, groupedBoardWidth],
+  )
 
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const common = useMemo(() => commonWords(notes), [notes])
@@ -720,7 +808,12 @@ function BaseFacilitator({ room, roomConfig }) {
               key={note.id}
               note={note}
               onMove={(id, x, y) => {
-                if (!placeIt) return moveNote(room, id, x, y)
+                if (!placeIt) {
+                  const board = boardRef.current
+                  const usable = Math.max(1, (board?.clientWidth || groupedBoardWidth) - groupedLayout.width - 10)
+                  const xRatio = Math.min(1, Math.max(0, (x - 5) / usable))
+                  return moveNote(room, id, x, y, xRatio, 0)
+                }
                 const board = boardRef.current
                 if (!board) return moveNote(room, id, x, y)
                 const rx = Math.min(1, Math.max(0, (x + 95) / board.clientWidth))
@@ -732,9 +825,12 @@ function BaseFacilitator({ room, roomConfig }) {
               common={common}
               normalized={placeIt}
               grouped={!placeIt}
+              groupedPosition={placeIt ? null : groupedLayout.positions.get(note.id)}
+              groupedWidth={placeIt ? null : groupedLayout.width}
             />
           )
         })}
+        {!placeIt && <div className="grouped-layout-spacer" aria-hidden="true" style={{ top: groupedLayout.height }} />}
         {similar && <div className="similarity-banner">{t.similarGroupsFound(similar.groupCount)}</div>}
       </div>
 
