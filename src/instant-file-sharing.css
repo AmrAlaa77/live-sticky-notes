@@ -252,3 +252,53 @@
   .ifs-upload-options h2{font-size:23px}
   .ifs-public-card{padding:20px 16px}
 }
+
+
+/* Trainer-only, independent visibility for each workshop QR code. */
+.ifs-qr-visibility-toggle{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  min-width:118px;
+  padding:6px 14px;
+  border:1px solid #b16e26;
+  border-radius:9px;
+  background:#fff1d8;
+  color:#79420d;
+  font-size:clamp(11px,.85vw,14px);
+  font-weight:850;
+  line-height:1.1;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+.ifs-qr-visibility-toggle:hover{background:#ffe3b6}
+.ifs-qr-visibility-toggle:focus-visible{
+  outline:3px solid #138eb5;
+  outline-offset:2px;
+}
+.ifs-qr-visibility-toggle.ifs-qr-is-hidden{
+  border-color:#4b9e8f;
+  background:#ddf8ed;
+  color:#086c54;
+}
+.ifs-qr-visibility-toggle.ifs-qr-is-hidden:hover{background:#c4f1df}
+.ifs-qr-hidden-placeholder{
+  width:min(100%,195px);
+  min-height:155px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:9px;
+  padding:14px 11px;
+  border:2px dashed #8ea9bc;
+  border-radius:9px;
+  background:rgba(255,255,255,.43);
+  color:#3b5870;
+  text-align:center;
+  font-size:13px;
+  line-height:1.3;
+}
+.ifs-qr-hidden-placeholder strong{font-weight:850;font-size:15px;color:#31506a}
+.ifs-qr-hidden-placeholder span{font-size:12px}
