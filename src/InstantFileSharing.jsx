@@ -8,6 +8,11 @@ const MB=1024*1024
 const TITLE='INSTANT FILE SHARING'
 const fmtSize=b=>b<MB?Math.ceil(b/1024)+' KB':(b/MB).toFixed(1)+' MB'
 const link=(type,token)=>window.location.origin+'/instant/'+type+'/'+encodeURIComponent(token)
+// WhatsApp transports only the workshop URL. Files remain within Instant File Sharing.
+function whatsAppShareUrl(url){
+ const message='Instant File Sharing — Upload Link\n\nOpen this link on your phone or laptop to upload your files directly to the workshop:\n'+url+'\n\nFiles are uploaded through Instant File Sharing, not WhatsApp.'
+ return 'https://wa.me/?text='+encodeURIComponent(message)
+}
 
 async function api(action,body={}){
   const {data,error}=await supabase.functions.invoke('instant-share',{body:{action,...body}})
@@ -50,11 +55,20 @@ function Copy({value}){
    catch{window.prompt('Copy link:',value)}
  }}>{ok?'Copied':'Copy link'}</button>
 }
-function QRPanel({title,url,subtitle,resizeHandle,height}){
+function QRPanel({title,url,subtitle,resizeHandle,height,shareUploadLink=false}){
  return <section className="ifs-panel ifs-qr" style={{height}}>
    <h2>{title}</h2><p>{subtitle}</p>
    <div className="ifs-qr-white"><QRCodeSVG value={url} size={165} level="H" marginSize={2}/></div>
-   <Copy value={url}/>
+   <div className="ifs-qr-link-actions">
+     <Copy value={url}/>
+     {shareUploadLink && <a
+       className="ifs-mini ifs-whatsapp-qr"
+       href={whatsAppShareUrl(url)}
+       target="_blank"
+       rel="noopener noreferrer"
+       title="Share this upload link by WhatsApp; actual files stay in this application"
+     >Share link via WhatsApp</a>}
+   </div>
    {resizeHandle?.()}
  </section>
 }
@@ -273,7 +287,7 @@ function Trainer(){
          <button className="ifs-mini" type="button" onClick={()=>load().catch(e=>setError(e.message))}>Refresh submissions</button>
          {resizeHandle(2)}
        </section>
-       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)} resizeHandle={()=>resizeHandle(3)} height={layout.heights[3]+'px'}/>
+       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)} resizeHandle={()=>resizeHandle(3)} height={layout.heights[3]+'px'} shareUploadLink/>
      </main>
      {(error||notice)&&<div className={error?'ifs-notification ifs-error':'ifs-notification ifs-ok'} role="status">{error||notice}</div>}
    </>}
@@ -281,6 +295,9 @@ function Trainer(){
 }
 function Public({mode,token}){
  const upload=mode==='upload'
+ const [showUploadForm,setShowUploadForm]=useState(false)
+ const uploadUrl=upload?link('upload',token):''
+ const whatsAppUrl=upload?whatsAppShareUrl(uploadUrl):''
  const [first,setFirst]=useState('')
  const [last,setLast]=useState('')
  const [text,setText]=useState('')
@@ -312,15 +329,49 @@ function Public({mode,token}){
  return <div className="ifs-public">
    <header><strong>{TITLE}</strong><h1>{upload?'Upload to your trainer':'Downloads from your trainer'}</h1><p>{upload?'Text and multiple files can be submitted together':title}</p></header>
    <main className="ifs-public-card">
-     {upload?<form onSubmit={submit}>
-       <label>First name <input value={first} maxLength={50} required onChange={e=>setFirst(e.target.value)}/></label>
-       <label>Last name <input value={last} maxLength={50} required onChange={e=>setLast(e.target.value)}/></label>
-       <label>Text (optional) <textarea value={text} maxLength={20000} onChange={e=>setText(e.target.value)}/></label>
-       <label>Attach files (up to 50 MB each) <input type="file" multiple onChange={e=>setFiles(Array.from(e.target.files||[]))}/></label>
-       {files.length>0&&<p>{files.length} file(s) selected</p>}
-       <button className="ifs-primary" disabled={busy}>{busy?'Sending…':'Send to trainer'}</button>
-       {progress&&<p>{progress}</p>}
-     </form>:<>
+     {upload?<section className="ifs-upload-journey">
+       <div className="ifs-upload-options">
+         <span className="ifs-upload-eyebrow">INSTANT FILE SHARING · WORKSHOP UPLOAD</span>
+         <h2 id="ifs-upload-choices-title">How would you like to upload?</h2>
+         <p className="ifs-upload-subtitle">Choose the device that has your files. Your files go directly into the workshop application — never through WhatsApp.</p>
+         <div className="ifs-upload-choice-grid" role="group" aria-labelledby="ifs-upload-choices-title">
+           <button type="button"
+             className={'ifs-upload-option ifs-upload-direct'+(showUploadForm?' is-selected':'')}
+             onClick={()=>setShowUploadForm(true)}>
+             <span className="ifs-upload-option-icon" aria-hidden="true">⇧</span>
+             <span><strong>Upload Files Now</strong><small>Use this phone or laptop to submit files and text directly.</small></span>
+           </button>
+           <a className="ifs-upload-option ifs-upload-whatsapp"
+             href={whatsAppUrl}
+             target="_blank"
+             rel="noopener noreferrer"
+             aria-label="Send this workshop upload link via WhatsApp">
+             <span className="ifs-upload-option-icon" aria-hidden="true">↗</span>
+             <span><strong>Send Upload Link via WhatsApp</strong><small>Send the link to yourself, then open it on your laptop.</small></span>
+           </a>
+         </div>
+         <div className="ifs-upload-copy">
+           <span>Or copy the workshop upload link:</span>
+           <Copy value={uploadUrl}/>
+         </div>
+       </div>
+       {showUploadForm?<form id="ifs-participant-upload-form" onSubmit={submit} className="ifs-participant-upload-form">
+         <div className="ifs-upload-form-heading">
+           <h3>Upload to your workshop</h3>
+           <button type="button" className="ifs-mini" onClick={()=>setShowUploadForm(false)}>Other options</button>
+         </div>
+         <label>First name <input value={first} maxLength={50} required onChange={e=>setFirst(e.target.value)}/></label>
+         <label>Last name <input value={last} maxLength={50} required onChange={e=>setLast(e.target.value)}/></label>
+         <label>Text (optional) <textarea value={text} maxLength={20000} onChange={e=>setText(e.target.value)}/></label>
+         <label>Attach files (up to 50 MB each) <input type="file" multiple onChange={e=>setFiles(Array.from(e.target.files||[]))}/></label>
+         {files.length>0&&<p>{files.length} file(s) selected</p>}
+         <button className="ifs-primary" disabled={busy}>{busy?'Sending…':'Send to trainer'}</button>
+         {progress&&<p>{progress}</p>}
+       </form>:<div className="ifs-upload-transfer-guide">
+         <strong>Uploading from a laptop?</strong>
+         <span>Tap the WhatsApp option, send the link to your own chat, open that link in WhatsApp on your laptop, then choose “Upload Files Now.” Your files will appear in the trainer's Participant Uploads panel.</span>
+       </div>}
+     </section>:<>
        <p>Everything shared during this workshop appears below and refreshes automatically.</p>
        {items.map(i=><Item key={i.id} item={i} />)}
        {!items.length&&!error&&<p>No downloads yet.</p>}
