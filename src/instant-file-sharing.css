@@ -185,3 +185,70 @@
   .ifs-workshop-actions button{font-size:10px;padding:5px}
   .ifs-height-handle{min-width:95px;height:30px}
 }
+
+
+/* QR upload link choice — WhatsApp shares only the URL, never the files. */
+.ifs-qr-link-actions{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+  gap:5px;width:100%;
+}
+.ifs-whatsapp-qr{
+  background:#e2faec;color:#13683a;border-color:#81cb9d;
+  font-size:clamp(10px,.72vw,12px);white-space:normal;
+  text-align:center;
+}
+.ifs-whatsapp-qr:hover{background:#c8f6d9}
+.ifs-upload-journey{display:flex;flex-direction:column;gap:18px}
+.ifs-upload-options{display:flex;flex-direction:column;gap:12px}
+.ifs-upload-eyebrow{font-size:11px;font-weight:850;letter-spacing:.09em;color:#1485a5}
+.ifs-upload-options h2{margin:0;color:#092f48;font-size:clamp(21px,4vw,27px);line-height:1.15}
+.ifs-upload-subtitle{margin:0;color:#4a6475;font-size:14px;line-height:1.45}
+.ifs-upload-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:4px}
+.ifs-upload-option{
+  display:flex;align-items:flex-start;justify-content:flex-start;gap:11px;
+  min-height:136px;width:100%;padding:17px 13px;
+  text-align:left;color:#143953;text-decoration:none;
+  border:2px solid #b5d4df;border-radius:13px;
+  background:#edf8fd;cursor:pointer;
+  transition:background .15s,border-color .15s,box-shadow .15s;
+}
+.ifs-upload-option-icon{
+  display:grid;place-items:center;flex:0 0 37px;
+  width:37px;height:37px;border-radius:10px;
+  font-size:27px;line-height:1;font-weight:900;
+  background:#d7eff9;color:#087d9b;
+}
+.ifs-upload-option>span:last-child{display:flex;flex-direction:column;gap:7px;min-width:0}
+.ifs-upload-option strong{font-size:clamp(14px,2.7vw,16px);line-height:1.22}
+.ifs-upload-option small{font-size:12px;line-height:1.4;color:#416278}
+.ifs-upload-direct{border-color:#8dbfd1}
+.ifs-upload-direct:hover,.ifs-upload-direct.is-selected{background:#dff3fc;border-color:#148daf;box-shadow:0 0 0 2px #148daf1f}
+.ifs-upload-whatsapp{background:#f0fbf3;border-color:#acdabe}
+.ifs-upload-whatsapp .ifs-upload-option-icon{color:#168647;background:#d7f7e2}
+.ifs-upload-whatsapp:hover{background:#dff7e8;border-color:#2f9d61;box-shadow:0 0 0 2px #2f9d611f}
+.ifs-upload-option:focus-visible{outline:3px solid #317cad;outline-offset:2px}
+.ifs-upload-copy{display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:#506a7b;font-size:12px}
+.ifs-upload-copy .ifs-mini{padding:8px 12px;font-size:12px}
+.ifs-upload-transfer-guide{
+  background:#e7f4fb;border-left:4px solid #3198b6;
+  border-radius:8px;padding:14px 15px;
+  display:flex;flex-direction:column;gap:5px;
+  line-height:1.5;font-size:13px;color:#274a60;
+}
+.ifs-upload-transfer-guide strong{color:#163e57;font-size:14px}
+.ifs-participant-upload-form{
+  padding:17px 16px 19px;border:1px solid #b0d1e1;
+  border-radius:13px;background:#f0f8fc;
+  display:flex;flex-direction:column;gap:11px;
+}
+.ifs-upload-form-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.ifs-upload-form-heading h3{margin:0;font-size:17px;color:#123f5b}
+.ifs-upload-form-heading .ifs-mini{font-size:11px}
+@media(max-width:570px){
+  .ifs-upload-choice-grid{grid-template-columns:1fr;gap:10px}
+  .ifs-upload-option{min-height:100px;padding:14px 13px}
+  .ifs-upload-option strong{font-size:16px}
+  .ifs-upload-option small{font-size:13px}
+  .ifs-upload-options h2{font-size:23px}
+  .ifs-public-card{padding:20px 16px}
+}
