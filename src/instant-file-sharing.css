@@ -58,3 +58,62 @@
 .ifs-public-card .ifs-item{background:#f1f8fd}
 @media(max-width:1100px){.ifs-four-panels{grid-template-columns:repeat(2,minmax(0,1fr));max-height:none;height:auto}.ifs-panel{min-height:290px}.ifs-hero-spacer{min-height:130px}}
 @media(max-width:620px){.ifs-four-panels{grid-template-columns:1fr;padding:10px}.ifs-panel{min-height:260px}.ifs-qr{min-height:300px}.ifs-hero-spacer{min-height:70px}.ifs-choose-form{flex-direction:column}.ifs-workshop-line{padding:9px;font-size:11px}.ifs-top strong{font-size:11px}.ifs-top{padding:10px}}
+
+
+/* Workshop panel resizing: independent width + height, with visible corner grips.
+   Scoped to Instant File Sharing only. */
+.ifs-four-panels{
+  height:auto;
+  min-height:335px;
+  max-height:none;
+  grid-auto-rows:min-content;
+  align-items:start;
+  gap:12px;
+  padding:12px 18px 24px;
+  overflow:visible;
+}
+.ifs-panel{
+  position:relative;
+  flex-shrink:0;
+  min-height:260px;
+  padding-bottom:34px;
+  overflow:hidden;
+}
+.ifs-qr{min-height:260px}
+.ifs-resize-handle{
+  position:absolute;
+  right:5px;
+  bottom:5px;
+  z-index:4;
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  background:#f4faff;
+  color:#06446a;
+  border:1px solid #75a1b7;
+  border-radius:7px;
+  box-shadow:0 2px 7px #0002;
+  font-size:23px;
+  line-height:1;
+  font-weight:900;
+  cursor:nwse-resize;
+  touch-action:none;
+  user-select:none;
+}
+.ifs-resize-handle:hover,.ifs-resize-handle:focus-visible{
+  background:#c8eeff;
+  box-shadow:0 0 0 2px #087ea0;
+}
+.ifs-workshop-actions{display:flex;align-items:center;gap:9px}
+.ifs-workshop-actions button{background:#ffffff25;border:1px solid #fff6;color:#fff;border-radius:6px;font-weight:750;padding:7px 10px;font-size:12px}
+.ifs-workshop-actions button:hover{background:#ffffff4a}
+@media(max-width:1100px){
+  .ifs-four-panels{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px;min-height:0}
+  .ifs-panel{min-height:260px}
+  .ifs-hero-spacer{min-height:150px}
+}
+@media(max-width:620px){
+  .ifs-four-panels{grid-template-columns:minmax(0,1fr)!important}
+  .ifs-hero-spacer{min-height:70px}
+}
