@@ -132,6 +132,14 @@ export async function moveNote(code, noteId, x, y, xRatio = null, yRatio = null)
   if (error) console.error(error)
 }
 
+export async function resizeNote(code, noteId, scale) {
+  const value = Math.round(Math.max(0.75, Math.min(2.75, Number(scale) || 1)) * 100) / 100
+  const { error } = await supabase.from('notes')
+    .update({ note_scale: value, updated_at: new Date().toISOString() })
+    .eq('id', noteId).eq('room_code', code)
+  if (error) throw new Error('resizeNote: ' + error.message)
+}
+
 export async function clearRoom(code) {
   const { error: notesError } = await supabase.from('notes').delete().eq('room_code', code)
   if (notesError) throw new Error('clearRoom.notes: ' + notesError.message)
