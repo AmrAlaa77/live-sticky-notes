@@ -514,13 +514,13 @@ function storedQRPosition(room) {
   return { x: 0.01, y: 0.02 }
 }
 
-function DraggableGroupedQR({ room, value, boardRef, boardWidth, boardHeight, onChange, title }) {
+function DraggableGroupedQR({ room, value, boardWidth, boardHeight, onChange, title, position }) {
   const ref = useRef(null)
   const pointer = useRef(null)
   const [preview, setPreview] = useState(null)
   const maxX = Math.max(0, boardWidth - GROUPED_QR_WIDTH)
   const maxY = Math.max(0, boardHeight - GROUPED_QR_HEIGHT)
-  const point = preview || { x: Math.round(value.x * maxX), y: Math.round(value.y * maxY) }
+  const point = preview || { x: Math.round(position.x * maxX), y: Math.round(position.y * maxY) }
 
   function start(event) {
     if (event.button !== 0) return
@@ -713,6 +713,7 @@ function BaseFacilitator({ room, roomConfig }) {
   const { t } = useLang()
   const [notes, setNotes] = useState([])
   const [qrVisible, setQrVisible] = useState(true)
+  const [qrPosition, setQrPosition] = useState(() => storedQRPosition(room))
   const [clearOpen, setClearOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [similar, setSimilar] = useState(null)
@@ -724,7 +725,8 @@ function BaseFacilitator({ room, roomConfig }) {
   const backgroundInputRef = useRef(null)
   const containerRef = useRef(null)
   const boardRef = useRef(null)
-  const [groupedBoardWidth, setGroupedBoardWidth] = useState(1200)
+  const [groupedBoardSize, setGroupedBoardSize] = useState({ width: 1200, height: 760 })
+  const groupedBoardWidth = groupedBoardSize.width
 
   useEffect(() => subscribeToNotes(room, setNotes), [room])
   useEffect(() => {
@@ -751,11 +753,15 @@ function BaseFacilitator({ room, roomConfig }) {
     return () => { active = false }
   }, [placeIt])
 
-  // Automatically fill horizontal rows; manual drags keep their saved locations.
+  // Measure the projection board in normal, full-screen, and resized windows.
   useEffect(() => {
-    if (placeIt || !boardRef.current) return
+    if (!boardRef.current) return
     const board = boardRef.current
-    const measure = () => setGroupedBoardWidth((prev) => board.clientWidth || prev)
+    const measure = () => setGroupedBoardSize((prev) => {
+      const width = board.clientWidth || prev.width
+      const height = board.clientHeight || prev.height
+      return prev.width === width && prev.height === height ? prev : { width, height }
+    })
     measure()
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(measure)
@@ -766,10 +772,22 @@ function BaseFacilitator({ room, roomConfig }) {
     return () => window.removeEventListener('resize', measure)
   }, [placeIt])
 
+  const qrBlock = useMemo(() => qrVisible ? {
+    x: qrPosition.x * Math.max(0, groupedBoardSize.width - GROUPED_QR_WIDTH),
+    y: qrPosition.y * Math.max(0, groupedBoardSize.height - GROUPED_QR_HEIGHT),
+    width: GROUPED_QR_WIDTH,
+    height: GROUPED_QR_HEIGHT,
+  } : null, [qrVisible, qrPosition.x, qrPosition.y, groupedBoardSize.width, groupedBoardSize.height])
+
   const groupedLayout = useMemo(
-    () => groupedRowLayout(notes, groupedBoardWidth),
-    [notes, groupedBoardWidth],
+    () => groupedRowLayout(notes, groupedBoardWidth, qrBlock),
+    [notes, groupedBoardWidth, qrBlock],
   )
+  function saveQRPosition(next) {
+    setQrPosition(next)
+    try { localStorage.setItem('sticky-notes-qr-position-' + room, JSON.stringify(next)) }
+    catch { /* The QR is still movable when storage is unavailable. */ }
+  }
 
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const common = useMemo(() => commonWords(notes), [notes])
@@ -927,13 +945,7 @@ function BaseFacilitator({ room, roomConfig }) {
               {backgroundMessage && <span className="place-it-background-message">{backgroundMessage}</span>}
             </div>
           )}
-          {qrVisible && (
-            <div className="qr-popover">
-              <QRCodeSVG value={joinUrl} size={168} />
-              <div className="code">{room}</div>
-              <p>{t.scanToJoin}</p>
-            </div>
-          )}
+
         </div>
         <div className="toolbar-group">
           {similar
@@ -958,6 +970,15 @@ function BaseFacilitator({ room, roomConfig }) {
         } : undefined}
       >
         {notes.length === 0 && <div className={`board-empty ${placeIt ? 'place-it-empty' : ''}`}>{t.emptyBoard}</div>}
+        {qrVisible && <DraggableGroupedQR
+          room={room}
+          value={joinUrl}
+          boardWidth={groupedBoardSize.width}
+          boardHeight={groupedBoardSize.height}
+          onChange={saveQRPosition}
+          title={t.scanToJoin}
+          position={qrPosition}
+        />}
         {notes.map((note) => {
           let simClass = ''
           if (similar) {
@@ -969,19 +990,21 @@ function BaseFacilitator({ room, roomConfig }) {
               key={note.id}
               note={note}
               onMove={(id, x, y) => {
+                const board = boardRef.current
+                const noteWidth = placeIt ? 190 * noteScale(note) : (groupedLayout.positions.get(id)?.width || groupedLayout.width)
+                const noteHeight = placeIt ? 150 * noteScale(note) : (groupedLayout.positions.get(id)?.height || 150)
                 if (!placeIt) {
-                  const board = boardRef.current
-                  const usable = Math.max(1, (board?.clientWidth || groupedBoardWidth) - groupedLayout.width - 10)
-                  const xRatio = Math.min(1, Math.max(0, (x - 5) / usable))
+                  const available = Math.max(1, (board?.clientWidth || groupedBoardWidth) - noteWidth - 10)
+                  const xRatio = Math.min(1, Math.max(0, (x - 5) / available))
                   return moveNote(room, id, x, y, xRatio, 0)
                 }
-                const board = boardRef.current
                 if (!board) return moveNote(room, id, x, y)
-                const rx = Math.min(1, Math.max(0, (x + 95) / board.clientWidth))
-                const ry = Math.min(1, Math.max(0, (y + 75) / board.clientHeight))
+                const rx = Math.min(1, Math.max(0, (x + noteWidth / 2) / board.clientWidth))
+                const ry = Math.min(1, Math.max(0, (y + noteHeight / 2) / board.clientHeight))
                 return moveNote(room, id, x, y, rx, ry)
               }}
               onDelete={(id) => deleteNote(room, id)}
+              onResize={(id, nextScale) => resizeNote(room, id, nextScale).catch(console.error)}
               simClass={simClass}
               common={common}
               normalized={placeIt}
