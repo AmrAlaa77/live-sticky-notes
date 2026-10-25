@@ -32,7 +32,7 @@ const I18N = {
     createRoom: 'Create room',
     chooseMode: 'Choose a mode',
     groupedMode: 'Grouped Sticky Notes',
-    groupedDesc: 'Automatically stack sticky notes by color.',
+    groupedDesc: 'Yellow sticky notes fill each row from left to right.',
     placeItMode: 'Place It',
     placeItDesc: 'Participants choose where their note appears on the board.',
     superstarMode: 'Superstar',
@@ -110,7 +110,7 @@ const I18N = {
     createRoom: 'إنشاء غرفة',
     chooseMode: 'اختر الوضع',
     groupedMode: 'الملاحظات المجمّعة',
-    groupedDesc: 'ترتيب الملاحظات تلقائيًا بحسب اللون.',
+    groupedDesc: 'ملاحظات صفراء تُرتَّب أفقيًا من اليمين لليسار ثم تنتقل للسطر التالي.',
     placeItMode: 'Place It',
     placeItDesc: 'المشاركون يختارون مكان ظهور الملاحظة على اللوحة.',
     superstarMode: 'Superstar',
@@ -413,7 +413,7 @@ function needsLayout(notes, qrVisible) {
   return false
 }
 
-function StickyNote({ note, onMove, onDelete, simClass, common, normalized = false }) {
+function StickyNote({ note, onMove, onDelete, simClass, common, normalized = false, grouped = false }) {
   const [dragging, setDragging] = useState(false)
   const ref = useRef(null)
   const drag = useRef(null)
@@ -456,19 +456,21 @@ function StickyNote({ note, onMove, onDelete, simClass, common, normalized = fal
   return (
     <div
       ref={ref}
-      className={`sticky-note ${dragging ? 'dragging' : ''} ${simClass || ''}`}
-      data-color={note.color}
+      className={`sticky-note ${grouped ? 'grouped-sticky-note' : ''} ${dragging ? 'dragging' : ''} ${simClass || ''}`}
+      data-color={grouped ? 'yellow' : note.color}
       data-lang={note.lang}
       style={{
-        left: normalized && Number.isFinite(note.x_ratio) ? `calc(${note.x_ratio * 100}% - 95px)` : note.x_position,
-        top: normalized && Number.isFinite(note.y_ratio) ? `calc(${note.y_ratio * 100}% - 75px)` : note.y_position,
-        transform: `rotate(${note.rotation || 0}deg)`,
+        ...(grouped ? {} : {
+          left: normalized && Number.isFinite(note.x_ratio) ? `calc(${note.x_ratio * 100}% - 95px)` : note.x_position,
+          top: normalized && Number.isFinite(note.y_ratio) ? `calc(${note.y_ratio * 100}% - 75px)` : note.y_position,
+          transform: `rotate(${note.rotation || 0}deg)`,
+        }),
         boxShadow: dragging ? '0 14px 26px rgba(0,0,0,.35)' : '3px 6px 10px rgba(0,0,0,.28)',
       }}
-      onPointerDown={pointerDown}
-      onPointerMove={pointerMove}
-      onPointerUp={pointerUp}
-      onPointerCancel={pointerUp}
+      onPointerDown={grouped ? undefined : pointerDown}
+      onPointerMove={grouped ? undefined : pointerMove}
+      onPointerUp={grouped ? undefined : pointerUp}
+      onPointerCancel={grouped ? undefined : pointerUp}
     >
       <button className="sticky-note-delete" type="button" onClick={() => onDelete(note.id)}>✕</button>
       <div className="sticky-note-text">{renderHighlightedText(note.text, common)}</div>
@@ -518,11 +520,7 @@ function BaseFacilitator({ room, roomConfig }) {
     return () => { active = false }
   }, [placeIt])
 
-  useEffect(() => {
-    if (placeIt || notes.length === 0 || !needsLayout(notes, qrVisible)) return
-    const next = layoutNotes(notes, qrVisible)
-    Promise.all(next.map((p) => moveNote(room, p.id, p.x, p.y))).catch(console.error)
-  }, [notes, qrVisible, room, placeIt])
+  // Grouped notes use CSS row-first layout; no background database repositioning.
 
   const joinUrl = useMemo(() => `${window.location.origin}/join/${room}`, [room])
   const common = useMemo(() => commonWords(notes), [notes])
@@ -701,7 +699,7 @@ function BaseFacilitator({ room, roomConfig }) {
 
       <div
         ref={boardRef}
-        className={`board ${placeIt ? 'place-it-board' : ''}`}
+        className={`board ${placeIt ? 'place-it-board' : 'grouped-sticky-board'}`}
         style={placeIt ? {
           backgroundColor: '#fff',
           backgroundImage: roomConfig?.background_data ? `url(${roomConfig.background_data})` : 'none',
@@ -733,6 +731,7 @@ function BaseFacilitator({ room, roomConfig }) {
               simClass={simClass}
               common={common}
               normalized={placeIt}
+              grouped={!placeIt}
             />
           )
         })}
@@ -1336,7 +1335,7 @@ function StickyParticipant({ room, participant, roomConfig }) {
         participantId: participant.id,
         participantName: participant.name,
         text: trimmed,
-        color,
+        color: placeItMode ? color : 'yellow',
         lang,
         mode: roomConfig?.mode || 'grouped',
         xRatio: placement?.rx,
@@ -1378,7 +1377,7 @@ function StickyParticipant({ room, participant, roomConfig }) {
           <div className={`composer-meta ${over ? 'limit' : ''}`}>
             <span>{remaining} {t.charactersLeft}</span><span>{text.length}/{MAX_CHARS}</span>
           </div>
-          <ColorPicker value={color} onChange={setColor} />
+          {placeItMode && <ColorPicker value={color} onChange={setColor} />}
           {placeItMode && (
             <div className="placement-section">
               <div className="placement-title">{t.choosePosition}</div>
@@ -1399,7 +1398,7 @@ function StickyParticipant({ room, participant, roomConfig }) {
           {myNotes.map((note) => {
             const editing = editingId === note.id
             return (
-              <div className="my-note-row" data-color={note.color} key={note.id}>
+              <div className="my-note-row" data-color={placeItMode ? note.color : 'yellow'} key={note.id}>
                 {editing ? (
                   <div className="my-note-edit">
                     <textarea value={editText} maxLength={MAX_CHARS} onChange={(e) => setEditText(e.target.value)} rows={3} autoFocus />
