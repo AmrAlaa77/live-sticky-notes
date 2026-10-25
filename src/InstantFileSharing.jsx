@@ -55,10 +55,19 @@ function Copy({value}){
    catch{window.prompt('Copy link:',value)}
  }}>{ok?'Copied':'Copy link'}</button>
 }
-function QRPanel({title,url,subtitle,resizeHandle,height,shareUploadLink=false}){
+function QRPanel({title,url,subtitle,resizeHandle,height,shareUploadLink=false,visible=true,onToggleVisibility}){
  return <section className="ifs-panel ifs-qr" style={{height}}>
    <h2>{title}</h2><p>{subtitle}</p>
-   <div className="ifs-qr-white"><QRCodeSVG value={url} size={165} level="H" marginSize={2}/></div>
+   <button
+     type="button"
+     className={'ifs-qr-visibility-toggle'+(!visible?' ifs-qr-is-hidden':'')}
+     aria-pressed={!visible}
+     aria-label={(visible?'Hide ':'Show ')+title.replace(/^\d+\.\s*/, '')}
+     onClick={onToggleVisibility}
+   >{visible?'◉ Hide QR':'◉ Show QR'}</button>
+   {visible
+     ? <div className="ifs-qr-white"><QRCodeSVG value={url} size={165} level="H" marginSize={2}/></div>
+     : <div className="ifs-qr-hidden-placeholder" role="status"><strong>QR code hidden</strong><span>Select Show QR to display it again.</span></div>}
    <div className="ifs-qr-link-actions">
      <Copy value={url}/>
      {shareUploadLink && <a
@@ -105,9 +114,30 @@ function savedPanelLayout(workshopId){
   return DEFAULT_PANEL_LAYOUT
 }
 
+function savedQRVisibility(workshopId){
+  if(!workshopId)return {download:true,upload:true}
+  try {
+    const saved=JSON.parse(localStorage.getItem('ifs-qr-visibility-'+workshopId)||'null')
+    if(typeof saved?.download==='boolean' && typeof saved?.upload==='boolean'){
+      return {download:saved.download,upload:saved.upload}
+    }
+  }catch { /* Default to visible if browser storage is unavailable. */ }
+  return {download:true,upload:true}
+}
+
 function Trainer(){
  const [workshops,setWorkshops]=useState([])
  const [selected,setSelected]=useState(null)
+ const [qrVisibility,setQRVisibility]=useState({download:true,upload:true})
+ useEffect(()=>setQRVisibility(savedQRVisibility(selected?.id)),[selected?.id])
+ function toggleQR(which){
+   if(which!=='upload' && which!=='download')return
+   const next={...qrVisibility,[which]:!qrVisibility[which]}
+   setQRVisibility(next)
+   if(selected?.id)try{
+     localStorage.setItem('ifs-qr-visibility-'+selected.id,JSON.stringify(next))
+   }catch{ /* QR still toggles when local storage is blocked. */ }
+ }
  const screenRef=useRef(null)
  const [fullscreen,setFullscreen]=useState(false)
  useEffect(()=>{
@@ -278,7 +308,7 @@ function Trainer(){
          <div className="ifs-feed">{items.filter(i=>i.direction==='outgoing').map(i=><Item key={i.id} item={i} trainer onDelete={remove}/> )}</div>
          {resizeHandle(0)}
        </section>
-       <QRPanel title="2. Download QR" subtitle="One QR displays everything you share" url={link('download',selected.download_token)} resizeHandle={()=>resizeHandle(1)} height={layout.heights[1]+'px'}/>
+       <QRPanel title="2. Download QR" subtitle="One QR displays everything you share" url={link('download',selected.download_token)} resizeHandle={()=>resizeHandle(1)} height={layout.heights[1]+'px'} visible={qrVisibility.download} onToggleVisibility={()=>toggleQR('download')}/>
        <section className="ifs-panel ifs-inbox" style={panelStyle(2)}>
          <h2>3. Participant uploads</h2><p>Submitted names, messages and files</p>
          <div className="ifs-feed">{items.filter(i=>i.direction==='incoming').map(i=><Item key={i.id} item={i} trainer onDelete={remove}/> )}
@@ -287,7 +317,7 @@ function Trainer(){
          <button className="ifs-mini" type="button" onClick={()=>load().catch(e=>setError(e.message))}>Refresh submissions</button>
          {resizeHandle(2)}
        </section>
-       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)} resizeHandle={()=>resizeHandle(3)} height={layout.heights[3]+'px'} shareUploadLink/>
+       <QRPanel title="4. Upload QR" subtitle="Participants submit text and files here" url={link('upload',selected.upload_token)} resizeHandle={()=>resizeHandle(3)} height={layout.heights[3]+'px'} visible={qrVisibility.upload} onToggleVisibility={()=>toggleQR('upload')} shareUploadLink/>
      </main>
      {(error||notice)&&<div className={error?'ifs-notification ifs-error':'ifs-notification ifs-ok'} role="status">{error||notice}</div>}
    </>}
