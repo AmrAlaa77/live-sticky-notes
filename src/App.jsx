@@ -1671,7 +1671,7 @@ function StickyParticipant({ room, participant, roomConfig }) {
           {placeItMode && (
             <div className="placement-section">
               <div className="placement-title">{t.choosePosition}</div>
-              <div className="placement-picker" onClick={choosePlacement}>
+              <div className={`placement-picker${roomConfig?.background_data ? ' has-background' : ''}`} style={{ backgroundImage: roomConfig?.background_data ? `url(${roomConfig.background_data})` : 'none' }} onClick={choosePlacement}>
                 {!placement && <span className="placement-hint">{t.positionHint}</span>}
                 {placement && <span className="placement-marker" style={{ left: `${placement.rx * 100}%`, top: `${placement.ry * 100}%` }} />}
               </div>
