@@ -11,6 +11,7 @@ import {
   clearRoom,
   createRoom,
   deleteNote,
+  deleteBackgroundAsset,
   deleteParticipantNote,
   getRoom,
   listBackgrounds,
@@ -106,6 +107,10 @@ const I18N = {
     renameBackground: 'Rename',
     backgroundNamePlaceholder: 'Background name',
     backgroundRenamed: 'Background renamed',
+    deleteBackground: 'Delete',
+    deletingBackground: 'Deleting…',
+    backgroundDeleted: 'Background deleted',
+    deleteBackgroundConfirm: (name, active) => `Permanently delete "${name}"? This cannot be undone.${active ? ' This background will also be removed from the current board.' : ''}`,
   },
   ar: {
     appName: 'الملاحظات اللاصقة الحية',
@@ -186,6 +191,10 @@ const I18N = {
     renameBackground: 'إعادة تسمية',
     backgroundNamePlaceholder: 'اسم الخلفية',
     backgroundRenamed: 'تمت إعادة تسمية الخلفية',
+    deleteBackground: 'حذف',
+    deletingBackground: 'جارٍ الحذف…',
+    backgroundDeleted: 'تم حذف الخلفية',
+    deleteBackgroundConfirm: (name, active) => `هل تريد حذف «${name}» نهائيًا؟ لا يمكن التراجع عن الحذف.${active ? ' ستتم إزالتها أيضًا من اللوحة الحالية.' : ''}`,
   },
 }
 
@@ -728,6 +737,7 @@ function BaseFacilitator({ room, roomConfig }) {
   const [fullscreen, setFullscreen] = useState(false)
   const [similar, setSimilar] = useState(null)
   const [backgroundUploading, setBackgroundUploading] = useState(false)
+  const [backgroundDeleting, setBackgroundDeleting] = useState(false)
   const [backgroundMessage, setBackgroundMessage] = useState('')
   const [savedBackgrounds, setSavedBackgrounds] = useState([])
   const [selectedBackgroundId, setSelectedBackgroundId] = useState('')
@@ -858,6 +868,31 @@ function BaseFacilitator({ room, roomConfig }) {
     }
   }
 
+  async function deleteSavedBackground() {
+    const selected = savedBackgrounds.find((item) => String(item.id) === String(selectedBackgroundId))
+    if (!selected || backgroundDeleting) return
+    const active = roomConfig?.background_data === selected.public_url
+    if (!window.confirm(t.deleteBackgroundConfirm(selected.name || 'Background', active))) return
+
+    setBackgroundDeleting(true)
+    setBackgroundMessage('')
+    try {
+      await deleteBackgroundAsset(selected)
+      const remaining = savedBackgrounds.filter((item) => String(item.id) !== String(selected.id))
+      setSavedBackgrounds(remaining)
+      setSelectedBackgroundId(remaining.length ? String(remaining[0].id) : '')
+      setBackgroundRename(remaining[0]?.name || '')
+      if (active) await updateRoom(room, { background_data: null })
+      setBackgroundMessage(t.backgroundDeleted)
+      window.setTimeout(() => setBackgroundMessage(''), 2500)
+    } catch (error) {
+      console.error('Delete Place It background:', error)
+      setBackgroundMessage(error.message || t.backgroundUploadError)
+    } finally {
+      setBackgroundDeleting(false)
+    }
+  }
+
   async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen()
     else await containerRef.current?.requestFullscreen?.()
@@ -951,6 +986,14 @@ function BaseFacilitator({ room, roomConfig }) {
                 disabled={!selectedBackgroundId}
               >
                 {t.restoreBackground}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={deleteSavedBackground}
+                disabled={!selectedBackgroundId || backgroundDeleting}
+              >
+                {backgroundDeleting ? t.deletingBackground : t.deleteBackground}
               </button>
               {backgroundMessage && <span className="place-it-background-message">{backgroundMessage}</span>}
             </div>
